@@ -22,8 +22,8 @@ public class RemoveBot implements TabExecutor {
             DummyPlayer dummy = DummyPlayer.dummies.get(iter);
             if (dummy.getName().equals(args[0])) {
                 sender.sendMessage("Bot '" + ChatColor.DARK_GREEN + args[0] + ChatColor.RESET + "' with UUID:["
-                        + ChatColor.GOLD + dummy.getUUID().toString() + ChatColor.RESET + "] was removed");
-                dummy.remove();
+                        + ChatColor.GOLD + dummy.getUniqueIDString() + ChatColor.RESET + "] was removed");
+                dummy.remove("Removed using command");
                 botsRemoved++;
             } else iter++;
         }

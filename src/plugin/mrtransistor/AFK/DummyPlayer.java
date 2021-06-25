@@ -10,23 +10,14 @@ import org.bukkit.craftbukkit.v1_16_R3.CraftWorld;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.UUID;
 
-public class DummyPlayer {
+public class DummyPlayer extends EntityPlayer {
     public static ArrayList<DummyPlayer> dummies = new ArrayList<>();
     public static ArrayList<String> dummyNames = new ArrayList<>();
 
-    private final String name;
-    private UUID uuid;
-    private final Player spawner;
-    private WorldServer worldServer;
-    private CraftPlayer dummyPlayer;
-    private EntityPlayer dummyEntityPlayer;
-
-    private String[] getSkin() {
-        EntityPlayer entityPlayer = ((CraftPlayer) this.spawner).getHandle();
+    private static String[] getSkin(EntityPlayer entityPlayer) {
         GameProfile gameProfile = entityPlayer.getProfile();
         Property property = gameProfile.getProperties().get("textures").iterator().next();
         String texture = property.getValue();
@@ -34,77 +25,76 @@ public class DummyPlayer {
         return new String[]{texture, signature};
     }
 
-    public DummyPlayer(Player spawner, String name) {
-        this.spawner = spawner;
-        this.name = name;
-        dummyNames.add(this.name);
+    public DummyPlayer(MinecraftServer server, WorldServer world, GameProfile profile, PlayerInteractManager interactManager) {
+        super(server, world, profile, interactManager);
+        dummyNames.add(this.getName());
         dummies.add(this);
     }
 
-    public String getName() {
-        return this.name;
-    }
-
-    public UUID getUUID() {
-        return this.uuid;
-    }
-
-    public Player getSpawner() {
-        return this.spawner;
-    }
-
-    public CraftPlayer getPlayer() {
-        return this.dummyPlayer;
-    }
-
-    public EntityPlayer getEntityPlayer() {
-        return this.dummyEntityPlayer;
-    }
-
-    public WorldServer getWorldServer() {
-        return this.worldServer;
-    }
-
-    public void spawn(Location location) throws IOException {
-        this.uuid = UUID.randomUUID();
-        GameProfile gameProfile = new GameProfile(uuid, name);
-        String[] texSign = getSkin();
-        gameProfile.getProperties().put("textures", new Property("textures", texSign[0], texSign[1]));
-        this.worldServer = ((CraftWorld) location.getWorld()).getHandle();
-
+    public static DummyPlayer spawnBot(String name, Location location, Player spawner) {
         MinecraftServer server = ((CraftServer) (Bukkit.getServer())).getServer();
-        CraftServer cServer = (CraftServer) Bukkit.getServer();
+        WorldServer worldServer = ((CraftWorld) location.getWorld()).getHandle();
         NetworkManager networkManager = new DummyNetworkManager();
 
-        dummyEntityPlayer = new EntityPlayer(server, this.worldServer, gameProfile, new PlayerInteractManager(this.worldServer));
-        dummyPlayer = new CraftPlayer(cServer, dummyEntityPlayer);
+        GameProfile gameProfile = new GameProfile(UUID.randomUUID(), name);
+        DummyPlayer dummy = new DummyPlayer(server, worldServer, gameProfile, new PlayerInteractManager(worldServer));
 
-        dummyEntityPlayer.getDataWatcher().set(new DataWatcherObject<>(16, DataWatcherRegistry.a), (byte) 127);
+        String[] texSign = getSkin(((CraftPlayer) spawner).getHandle());
+        gameProfile.getProperties().put("textures", new Property("textures", texSign[0], texSign[1]));
 
-        dummyPlayer.getHandle().playerConnection = new PlayerConnection(server, networkManager, dummyEntityPlayer);
-        this.worldServer.addPlayerJoin(dummyEntityPlayer);
+        dummy.getDataWatcher().set(new DataWatcherObject<>(16, DataWatcherRegistry.a), (byte) 0x7f); // show all model layers
 
-        dummyEntityPlayer.setLocation(location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
-        dummyEntityPlayer.getWorldServer().getChunkProvider().movePlayer(dummyEntityPlayer);
+        dummy.playerConnection = new PlayerConnection(server, networkManager, dummy);
+        worldServer.addPlayerJoin(dummy);
 
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            PlayerConnection plc = ((CraftPlayer) player).getHandle().playerConnection;
-            plc.sendPacket(new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.ADD_PLAYER, dummyEntityPlayer));
-            plc.sendPacket(new PacketPlayOutNamedEntitySpawn(dummyEntityPlayer));
-            plc.sendPacket(new PacketPlayOutEntityMetadata(dummyEntityPlayer.getId(), dummyEntityPlayer.getDataWatcher(), true));
-            plc.sendPacket(new PacketPlayOutEntityHeadRotation(dummyEntityPlayer, (byte) (dummyEntityPlayer.yaw * 256 / 360)));
-        }
+        dummy.setLocation(location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
+        worldServer.getChunkProvider().movePlayer(dummy);
+
+
+        server.getPlayerList().sendAll(new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.ADD_PLAYER, dummy));
+        server.getPlayerList().sendAll(new PacketPlayOutNamedEntitySpawn(dummy));
+        server.getPlayerList().sendAll(new PacketPlayOutEntityMetadata(dummy.getId(), dummy.getDataWatcher(), true));
+        server.getPlayerList().sendAll(new PacketPlayOutEntityHeadRotation(dummy, (byte) (dummy.yaw * 256 / 360)));
+        return dummy;
     }
 
-    public void remove() {
-        this.dummyPlayer.kickPlayer("");
-        this.worldServer.removeEntity(this.dummyEntityPlayer);
-        this.dummyPlayer.getHandle().playerConnection = null;
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            PlayerConnection plc = ((CraftPlayer) player).getHandle().playerConnection;
-            plc.sendPacket(new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.REMOVE_PLAYER, dummyEntityPlayer));
+    @Override
+    public void tick() {
+        if (this.server.ai() % 10 == 0) {
+            this.playerConnection.syncPosition();
+            this.getWorldServer().getChunkProvider().movePlayer(this);
         }
-        dummyNames.remove(this.name);
+        super.tick();
+        this.playerTick();
+    }
+
+
+    //TODO: add getTargetedEntity() method to allow damaging targeted entities
+    /*public Entity getTargetedEntity() {
+        WorldServer world = this.getWorldServer();
+
+
+        Player player = this.getBukkitEntity();
+        Location eye = player.getEyeLocation();
+        for(org.bukkit.entity.Entity entity : player.getNearbyEntities(10, 10, 10)) {
+            Vector toEntity = entity.getLocation().toVector().subtract(eye.toVector());
+            double dot = toEntity.normalize().dot(eye.getDirection());
+            if(dot > 0.99D) return ((CraftEntity) entity).getHandle();
+        }
+        return null;
+    }*/
+
+    public void remove(String reason) {
+        this.dropInventory();
+        this.playerConnection.disconnect(reason);
+        dummyNames.remove(this.getName());
         dummies.remove(this);
     }
+
+    @Override
+    public void die(DamageSource damagesource) {
+        super.die(damagesource);
+        this.server.a(new TickTask(this.server.ai(), () -> remove("Died")));
+    }
+
 }

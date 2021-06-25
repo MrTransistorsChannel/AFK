@@ -8,7 +8,6 @@ import org.bukkit.entity.Player;
 
 import plugin.mrtransistor.AFK.DummyPlayer;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,20 +21,15 @@ public class SpawnBot implements TabExecutor {
                 return true;
             }
             if (!DummyPlayer.dummyNames.contains(args[0])) {
-                DummyPlayer plr = new DummyPlayer((Player) sender, args[0]);
-                try {
-                    plr.spawn(((Player) sender).getLocation());
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                DummyPlayer dummy = DummyPlayer.spawnBot(args[0], ((Player) sender).getLocation(), (Player) sender);
+
                 sender.sendMessage("Bot '" + ChatColor.DARK_GREEN + args[0] + ChatColor.RESET + "' with UUID:["
-                        + ChatColor.GOLD + plr.getUUID().toString() + ChatColor.RESET + "] spawned");
-                return true;
+                        + ChatColor.GOLD + dummy.getUniqueIDString() + ChatColor.RESET + "] spawned");
             }
             else {
                 sender.sendMessage(ChatColor.RED + "Bot with name '" + ChatColor.DARK_GREEN + args[0] + ChatColor.RED + "' already exists");
-                return true;
             }
+            return true;
         }
 
         sender.sendMessage("Sorry, this command is only for players");

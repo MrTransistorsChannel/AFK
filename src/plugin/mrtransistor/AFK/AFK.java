@@ -3,12 +3,10 @@ package plugin.mrtransistor.AFK;
 import net.minecraft.server.v1_16_R3.*;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.craftbukkit.v1_16_R3.CraftServer;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -37,17 +35,30 @@ public class AFK extends JavaPlugin implements Listener {
 
         this.updater = new BukkitRunnable() {
             /** BUGFIX FOR HEAD ROTATION PACKET NOT BEING REGISTERED PROPERLY **/
+            /*TODO: FIND THE PROBLEM THAT IS CAUSING UPDATES ON PLAYER JOIN NOT WORK*/
             @Override
             public void run() {
+                MinecraftServer server = ((CraftServer) Bukkit.getServer()).getServer();
                 for (DummyPlayer dummy : DummyPlayer.dummies) {
-                    for (Player player : Bukkit.getOnlinePlayers()) {
-                        EntityPlayer entityPlayer = dummy.getEntityPlayer();
-                        PlayerConnection plc = ((CraftPlayer) player).getHandle().playerConnection;
-                        plc.sendPacket(new PacketPlayOutEntityHeadRotation(entityPlayer, (byte) (entityPlayer.yaw * 256 / 360)));
-                    }
+                    server.getPlayerList().sendAll(new PacketPlayOutEntityHeadRotation(dummy, (byte) (dummy.yaw * 256/360)));
                 }
             }
         }.runTaskTimer(this, 0, 5);
+
+        // Attack test
+        /*new BukkitRunnable(){
+
+            @Override
+            public void run() {
+                for (DummyPlayer dummy : DummyPlayer.dummies) {
+                    Entity targetedEntity = dummy.getTargetedEntity();
+                    if(targetedEntity != null){
+                        dummy.swingHand(EnumHand.MAIN_HAND);
+                        dummy.attack(targetedEntity);
+                    }
+                }
+            }
+        }.runTaskTimer(this, 0, 20);*/
 
         getLogger().info("AFK plugin started!");
     }
@@ -60,8 +71,8 @@ public class AFK extends JavaPlugin implements Listener {
         for (int i = 0; i < numBots; i++) {
             DummyPlayer dummy = DummyPlayer.dummies.get(0);
             getLogger().info("Bot '" + ChatColor.DARK_GREEN + dummy.getName() + ChatColor.RESET + "' with UUID:["
-                    + ChatColor.GOLD + dummy.getUUID().toString() + ChatColor.RESET + "] was removed");
-            dummy.remove();
+                    + ChatColor.GOLD + dummy.getUniqueIDString() + ChatColor.RESET + "] was removed");
+            dummy.remove("Plugin stopped");
             botsRemoved++;
         }
         if (botsRemoved == 0) getLogger().info(ChatColor.GREEN + "No bots were removed");
@@ -72,47 +83,16 @@ public class AFK extends JavaPlugin implements Listener {
     }
 
     @EventHandler
-    public void onPlayerDeath(PlayerDeathEvent e){
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                Entity entity = e.getEntity();
-                String name = entity.getName();
-                int numBots = DummyPlayer.dummies.size();
-                int iter = 0;
-                for (int i = 0; i < numBots; i++) {
-                    DummyPlayer dummy = DummyPlayer.dummies.get(iter);
-                    if (dummy.getName().equals(name)) {
-                        dummy.remove();
-                    } else iter++;
-                }
-            }
-        }.runTaskLater(this, 20);
-    }
-
-    /*@EventHandler
-    public void onUnload(ChunkUnloadEvent e){
-        getLogger().info("Unloading chunk at " + e.getChunk().getX() + " " + e.getChunk().getZ());
-    }
-
-    @EventHandler
-    public void onLoad(ChunkLoadEvent e){
-
-        getLogger().info("Loading chunk at " + e.getChunk().getX() + " " + e.getChunk().getZ());
-    }*/
-
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent e) {
+    public void onJoin(PlayerJoinEvent e) {
         PlayerConnection plc = ((CraftPlayer) e.getPlayer()).getHandle().playerConnection;
         for (DummyPlayer dummy : DummyPlayer.dummies) {
-            EntityPlayer entityPlayer = dummy.getEntityPlayer();
             plc.sendPacket(new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.ADD_PLAYER,
-                    entityPlayer));
-            plc.sendPacket(new PacketPlayOutNamedEntitySpawn(entityPlayer));
-            plc.sendPacket(new PacketPlayOutEntityHeadRotation(entityPlayer,
-                    (byte) (entityPlayer.yaw * 256 / 360)));
-            plc.sendPacket(new PacketPlayOutEntityMetadata(entityPlayer.getId(),
-                    entityPlayer.getDataWatcher(), true));
+                    dummy));
+            plc.sendPacket(new PacketPlayOutNamedEntitySpawn(dummy));
+            plc.sendPacket(new PacketPlayOutEntityMetadata(dummy.getId(),
+                    dummy.getDataWatcher(), true));
+            plc.sendPacket(new PacketPlayOutEntityHeadRotation(dummy,
+                    (byte) (dummy.yaw * 256 / 360)));
         }
     }
 }
