@@ -1,0 +1,15 @@
+name: AFK
+version: 2.3
+author: MrTransistor
+main: plugin.mrtransistor.AFK.AFK
+commands:
+  spawnBot:
+    usage: "Usage: /spawnbot <name>"
+    description: "Spawns an EntityPlayer, that can be controlled from within the plugin and acts as a player, allowing loading mobs and random ticking"
+  removeBot:
+    usage: "Usage: /removebot <name>"
+    description: "Removes all bots with specified name"
+  removeAllBots:
+    usage: "Usage: /removeallbots"
+    description: "Removes all bots"
+api-version: 1.16
