@@ -5,14 +5,12 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftEntity;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import org.bukkit.scheduler.BukkitRunnable;
 import plugin.mrtransistor.AFK.commands.RemoveAllBots;
 import plugin.mrtransistor.AFK.commands.RemoveBot;
 import plugin.mrtransistor.AFK.commands.SpawnBot;
