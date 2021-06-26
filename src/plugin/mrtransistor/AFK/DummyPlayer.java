@@ -4,14 +4,22 @@ import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import net.minecraft.server.v1_16_R3.*;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.craftbukkit.v1_16_R3.CraftServer;
 import org.bukkit.craftbukkit.v1_16_R3.CraftWorld;
+import org.bukkit.craftbukkit.v1_16_R3.entity.CraftEntity;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.util.RayTraceResult;
+import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 public class DummyPlayer extends EntityPlayer {
     public static ArrayList<DummyPlayer> dummies = new ArrayList<>();
@@ -48,13 +56,14 @@ public class DummyPlayer extends EntityPlayer {
         worldServer.addPlayerJoin(dummy);
 
         dummy.setLocation(location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
+        dummy.setHeadRotation(location.getYaw());
+        dummy.setYawPitch(location.getYaw(), location.getPitch());
         worldServer.getChunkProvider().movePlayer(dummy);
 
 
         server.getPlayerList().sendAll(new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.ADD_PLAYER, dummy));
         server.getPlayerList().sendAll(new PacketPlayOutNamedEntitySpawn(dummy));
         server.getPlayerList().sendAll(new PacketPlayOutEntityMetadata(dummy.getId(), dummy.getDataWatcher(), true));
-        server.getPlayerList().sendAll(new PacketPlayOutEntityHeadRotation(dummy, (byte) (dummy.yaw * 256 / 360)));
         return dummy;
     }
 
@@ -68,21 +77,26 @@ public class DummyPlayer extends EntityPlayer {
         this.playerTick();
     }
 
+    //TODO: fix hitting through blocks (add block raytracing)
+    public LivingEntity getTargetedLivingEntity() {
+        Player bukkitPlayer = this.getBukkitEntity();
+        World world = bukkitPlayer.getWorld();
+        Location eyePos = bukkitPlayer.getEyeLocation();
+        Vector eyeDirection = bukkitPlayer.getEyeLocation().getDirection();
+        Predicate<org.bukkit.entity.Entity> filter = entity -> !entity.equals(bukkitPlayer);
+        double reach = this.playerConnection.getPlayer().getGameMode() == GameMode.CREATIVE ? 4.5 : 3;
 
-    //TODO: add getTargetedEntity() method to allow damaging targeted entities
-    /*public Entity getTargetedEntity() {
-        WorldServer world = this.getWorldServer();
+        RayTraceResult trace = world.rayTraceEntities(eyePos, eyeDirection, reach, filter);
+        if (trace == null) return null;
+        Entity hitEntity = trace.getHitEntity();
+        if (hitEntity instanceof LivingEntity)
+            return (LivingEntity) hitEntity;
+        else return null;
+    }
 
-
-        Player player = this.getBukkitEntity();
-        Location eye = player.getEyeLocation();
-        for(org.bukkit.entity.Entity entity : player.getNearbyEntities(10, 10, 10)) {
-            Vector toEntity = entity.getLocation().toVector().subtract(eye.toVector());
-            double dot = toEntity.normalize().dot(eye.getDirection());
-            if(dot > 0.99D) return ((CraftEntity) entity).getHandle();
-        }
-        return null;
-    }*/
+    public void attack(Entity entity) {
+        this.attack(((CraftEntity) entity).getHandle());
+    }
 
     public void remove(String reason) {
         this.dropInventory();

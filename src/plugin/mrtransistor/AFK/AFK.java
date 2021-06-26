@@ -3,22 +3,19 @@ package plugin.mrtransistor.AFK;
 import net.minecraft.server.v1_16_R3.*;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.craftbukkit.v1_16_R3.CraftServer;
+import org.bukkit.craftbukkit.v1_16_R3.entity.CraftEntity;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
 import plugin.mrtransistor.AFK.commands.RemoveAllBots;
 import plugin.mrtransistor.AFK.commands.RemoveBot;
 import plugin.mrtransistor.AFK.commands.SpawnBot;
 
 public class AFK extends JavaPlugin implements Listener {
-
-    private BukkitTask updater;
 
     @Override
     public void onEnable() {
@@ -33,28 +30,15 @@ public class AFK extends JavaPlugin implements Listener {
         getCommand("removeAllBots").setExecutor(new RemoveAllBots());
         getCommand("removeAllBots").setTabCompleter(new RemoveAllBots());
 
-        this.updater = new BukkitRunnable() {
-            /** BUGFIX FOR HEAD ROTATION PACKET NOT BEING REGISTERED PROPERLY **/
-            /*TODO: FIND THE PROBLEM THAT IS CAUSING UPDATES ON PLAYER JOIN NOT WORK*/
-            @Override
-            public void run() {
-                MinecraftServer server = ((CraftServer) Bukkit.getServer()).getServer();
-                for (DummyPlayer dummy : DummyPlayer.dummies) {
-                    server.getPlayerList().sendAll(new PacketPlayOutEntityHeadRotation(dummy, (byte) (dummy.yaw * 256/360)));
-                }
-            }
-        }.runTaskTimer(this, 0, 5);
-
         // Attack test
-        /*new BukkitRunnable(){
-
+        /*new BukkitRunnable() {
             @Override
             public void run() {
                 for (DummyPlayer dummy : DummyPlayer.dummies) {
-                    Entity targetedEntity = dummy.getTargetedEntity();
-                    if(targetedEntity != null){
-                        dummy.swingHand(EnumHand.MAIN_HAND);
-                        dummy.attack(targetedEntity);
+                    LivingEntity target = dummy.getTargetedLivingEntity();
+                    if (target != null) {
+                        dummy.swingHand(EnumHand.MAIN_HAND, true);
+                        dummy.attack(target);
                     }
                 }
             }
@@ -65,7 +49,6 @@ public class AFK extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        updater.cancel();
         int botsRemoved = 0;
         int numBots = DummyPlayer.dummies.size();
         for (int i = 0; i < numBots; i++) {
@@ -91,8 +74,14 @@ public class AFK extends JavaPlugin implements Listener {
             plc.sendPacket(new PacketPlayOutNamedEntitySpawn(dummy));
             plc.sendPacket(new PacketPlayOutEntityMetadata(dummy.getId(),
                     dummy.getDataWatcher(), true));
-            plc.sendPacket(new PacketPlayOutEntityHeadRotation(dummy,
-                    (byte) (dummy.yaw * 256 / 360)));
+        }
+    }
+
+    @EventHandler
+    public void onPlayerDeath(PlayerDeathEvent e){
+        getLogger().info("player died");
+        if(((CraftEntity)e.getEntity()).getHandle() instanceof DummyPlayer){
+            e.setDroppedExp(e.getEntity().getTotalExperience());
         }
     }
 }
