@@ -3,9 +3,7 @@ package plugin.mrtransistor.AFK;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import net.minecraft.server.v1_16_R3.*;
-import org.bukkit.Bukkit;
-import org.bukkit.GameMode;
-import org.bukkit.Location;
+import org.bukkit.*;
 import org.bukkit.World;
 import org.bukkit.craftbukkit.v1_16_R3.CraftServer;
 import org.bukkit.craftbukkit.v1_16_R3.CraftWorld;
@@ -18,6 +16,7 @@ import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -73,11 +72,28 @@ public class DummyPlayer extends EntityPlayer {
             this.playerConnection.syncPosition();
             this.getWorldServer().getChunkProvider().movePlayer(this);
         }
+
         super.tick();
         this.playerTick();
     }
 
-    //TODO: fix hitting through blocks (add block raytracing)
+    public void chaseAttacker(){
+        Player bukkitPlayer = this.getBukkitEntity();
+        EntityLiving damager = this.getLastDamager();
+
+        if(damager == null) return;
+
+        Vector toTarget = this.getBukkitEntity().getEyeLocation().toVector().subtract(((LivingEntity)damager.getBukkitEntity()).getEyeLocation().toVector()).normalize();
+        float yaw = (float) Math.atan2(toTarget.getX(), -toTarget.getZ());
+        float pitch = (float) Math.atan2(toTarget.getY(), Math.sqrt(toTarget.getX()*toTarget.getX() + toTarget.getZ()*toTarget.getZ()));
+        yaw *= 180/Math.PI;
+        pitch *= 180/Math.PI;
+        this.getBukkitEntity().getServer().getLogger().info(pitch + "");
+        this.setYawPitch(yaw, pitch);
+        this.setHeadRotation(yaw);
+        this.g(new Vec3D(0, 0, 1));
+    }
+
     public LivingEntity getTargetedLivingEntity() {
         Player bukkitPlayer = this.getBukkitEntity();
         World world = bukkitPlayer.getWorld();
@@ -86,7 +102,7 @@ public class DummyPlayer extends EntityPlayer {
         Predicate<org.bukkit.entity.Entity> filter = entity -> !entity.equals(bukkitPlayer);
         double reach = this.playerConnection.getPlayer().getGameMode() == GameMode.CREATIVE ? 4.5 : 3;
 
-        RayTraceResult trace = world.rayTraceEntities(eyePos, eyeDirection, reach, filter);
+        RayTraceResult trace = world.rayTrace(eyePos, eyeDirection, reach, FluidCollisionMode.NEVER, true, 0, filter);
         if (trace == null) return null;
         Entity hitEntity = trace.getHitEntity();
         if (hitEntity instanceof LivingEntity)
