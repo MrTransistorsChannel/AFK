@@ -103,7 +103,6 @@ public class DummyPlayer extends EntityPlayer {
             playerConnection.syncPosition();
             getWorldServer().getChunkProvider().movePlayer(this);
         }
-
         super.tick();
         playerTick();
     }

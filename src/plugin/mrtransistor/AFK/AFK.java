@@ -24,6 +24,7 @@ import org.bukkit.craftbukkit.v1_16_R3.entity.CraftEntity;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -99,9 +100,16 @@ public class AFK extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent e){
-        getLogger().info("player died");
         if(((CraftEntity)e.getEntity()).getHandle() instanceof DummyPlayer){
             e.setDroppedExp(e.getEntity().getTotalExperience());
+        }
+    }
+
+    @EventHandler
+    public void onFoodLevelChange(FoodLevelChangeEvent e){
+        if(((CraftEntity)e.getEntity()).getHandle() instanceof DummyPlayer){
+            e.setCancelled(true);
+            e.getEntity().setFoodLevel(20);
         }
     }
 }
