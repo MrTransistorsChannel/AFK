@@ -1,5 +1,5 @@
 name: AFK
-version: 2.3
+version: 2.4
 author: MrTransistor
 main: plugin.mrtransistor.AFK.AFK
 commands:
