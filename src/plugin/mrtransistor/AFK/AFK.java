@@ -28,6 +28,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import plugin.mrtransistor.AFK.commands.AFKUtils;
 import plugin.mrtransistor.AFK.commands.RemoveAllBots;
 import plugin.mrtransistor.AFK.commands.RemoveBot;
 import plugin.mrtransistor.AFK.commands.SpawnBot;
@@ -46,6 +47,8 @@ public class AFK extends JavaPlugin implements Listener {
         getCommand("removeBot").setTabCompleter(new RemoveBot());
         getCommand("removeAllBots").setExecutor(new RemoveAllBots());
         getCommand("removeAllBots").setTabCompleter(new RemoveAllBots());
+        getCommand("afkutils").setExecutor(new AFKUtils());
+        getCommand("afkutils").setTabCompleter(new AFKUtils());
 
         // Attack test
         /*new BukkitRunnable() {

@@ -40,6 +40,13 @@ public class DummyPlayer extends EntityPlayer {
     public static ArrayList<DummyPlayer> dummies = new ArrayList<>();
     public static ArrayList<String> dummyNames = new ArrayList<>();
 
+    private boolean isSelfDefending = false;
+    private boolean isAttackingContinuous = false;
+    private boolean isForcePoI = false;
+    private boolean aware = false;
+    private Location PoI_loc;
+    private float[] PoI_yawpitch = new float[2];
+
     private static String[] getSkin(EntityPlayer entityPlayer) {
         GameProfile gameProfile = entityPlayer.getProfile();
         Property property = gameProfile.getProperties().get("textures").iterator().next();
@@ -50,7 +57,7 @@ public class DummyPlayer extends EntityPlayer {
 
     public DummyPlayer(MinecraftServer server, WorldServer world, GameProfile profile, PlayerInteractManager interactManager) {
         super(server, world, profile, interactManager);
-        dummyNames.add(this.getName());
+        dummyNames.add(getName());
         dummies.add(this);
     }
 
@@ -84,39 +91,122 @@ public class DummyPlayer extends EntityPlayer {
 
     @Override
     public void tick() {
-        if (this.server.ai() % 10 == 0) {
-            this.playerConnection.syncPosition();
-            this.getWorldServer().getChunkProvider().movePlayer(this);
+        if(isSelfDefending) selfDefence();
+        if(isAttackingContinuous) attackContinuous();
+
+        //getBukkitEntity().getServer().getLogger().info("");
+
+        if (server.ai() % 10 == 0) {
+            playerConnection.syncPosition();
+            getWorldServer().getChunkProvider().movePlayer(this);
         }
 
         super.tick();
         this.playerTick();
     }
 
-    public void chaseAttacker(){
-        Player bukkitPlayer = this.getBukkitEntity();
-        EntityLiving damager = this.getLastDamager();
+    public void attackOnce() {
+        LivingEntity target = getTargetedLivingEntity();
+        if (getAttackCooldown(0.5f) == 1 && target != null) {
+            attack(target);
+        }
+        swingHand(EnumHand.MAIN_HAND);
+    }
 
-        if(damager == null) return;
+    public void setAttackingContinuous(boolean state){
+        isAttackingContinuous = state;
+    }
 
-        Vector toTarget = this.getBukkitEntity().getEyeLocation().toVector().subtract(((LivingEntity)damager.getBukkitEntity()).getEyeLocation().toVector()).normalize();
+    public boolean getAttackingContinuous(){
+        return isAttackingContinuous;
+    }
+
+    public void setSelfDefending(boolean state){
+        isSelfDefending = state;
+    }
+
+    public boolean getSelfDefending(){
+        return isSelfDefending;
+    }
+
+    public void setForcePoI(boolean state){
+        isForcePoI = state;
+        if(isForcePoI) {
+            PoI_loc = getBukkitEntity().getEyeLocation();
+            PoI_yawpitch[0] = PoI_loc.getYaw();
+            PoI_yawpitch[1] = PoI_loc.getPitch();
+        }
+
+    }
+
+    public boolean getForcePoI(){
+        return isForcePoI;
+    }
+
+    private void attackContinuous(){
+        if(!aware) {
+            LivingEntity target = getTargetedLivingEntity();
+            if (getAttackCooldown(0.5f) == 1 && target != null) {
+                attack(target);
+                swingHand(EnumHand.MAIN_HAND);
+            }
+        }
+    }
+
+    private void selfDefence() {
+        EntityLiving damager = getLastDamager();
+
+        if (damager == null){
+            if(aware){
+                Vector toTarget = getBukkitEntity().getEyeLocation().toVector().subtract(PoI_loc.toVector()).normalize();
+                float yaw = (float) Math.atan2(toTarget.getX(), -toTarget.getZ());
+                float pitch = (float) Math.atan2(toTarget.getY(), Math.sqrt(toTarget.getX() * toTarget.getX() + toTarget.getZ() * toTarget.getZ()));
+                yaw *= 180 / Math.PI;
+                pitch *= 180 / Math.PI;
+                setYawPitch(yaw, pitch);
+                setHeadRotation(yaw);
+                g(new Vec3D(0, 0, 1));
+                if(PoI_loc.distance(getBukkitEntity().getEyeLocation()) < 0.1){
+                    getBukkitEntity().setVelocity(new Vector(0, 0, 0));
+                    setYawPitch(PoI_yawpitch[0], PoI_yawpitch[1]);
+                    setHeadRotation(PoI_yawpitch[0]);
+                    aware = false;
+                }
+            }
+            return;
+        }
+        if(!aware){
+            if(!isForcePoI) {
+                PoI_loc = getBukkitEntity().getEyeLocation();
+                PoI_yawpitch[0] = PoI_loc.getYaw();
+                PoI_yawpitch[1] = PoI_loc.getPitch();
+            }
+            aware = true;
+        }
+
+        Vector toTarget = getBukkitEntity().getEyeLocation().toVector().subtract(((LivingEntity) damager.getBukkitEntity()).getEyeLocation().toVector()).normalize();
         float yaw = (float) Math.atan2(toTarget.getX(), -toTarget.getZ());
-        float pitch = (float) Math.atan2(toTarget.getY(), Math.sqrt(toTarget.getX()*toTarget.getX() + toTarget.getZ()*toTarget.getZ()));
-        yaw *= 180/Math.PI;
-        pitch *= 180/Math.PI;
-        this.getBukkitEntity().getServer().getLogger().info(pitch + "");
-        this.setYawPitch(yaw, pitch);
-        this.setHeadRotation(yaw);
-        this.g(new Vec3D(0, 0, 1));
+        float pitch = (float) Math.atan2(toTarget.getY(), Math.sqrt(toTarget.getX() * toTarget.getX() + toTarget.getZ() * toTarget.getZ()));
+        yaw *= 180 / Math.PI;
+        pitch *= 180 / Math.PI;
+        setYawPitch(yaw, pitch);
+        setHeadRotation(yaw);
+        g(new Vec3D(0, 0, 1));
+
+        LivingEntity target = getTargetedLivingEntity();
+        if (getAttackCooldown(0.5f) == 1 && target != null && target.getUniqueId().equals(damager.getUniqueID())) {
+            attack(target);
+            swingHand(EnumHand.MAIN_HAND);
+        }
     }
 
     public LivingEntity getTargetedLivingEntity() {
-        Player bukkitPlayer = this.getBukkitEntity();
+        Player bukkitPlayer = getBukkitEntity();
         World world = bukkitPlayer.getWorld();
         Location eyePos = bukkitPlayer.getEyeLocation();
         Vector eyeDirection = bukkitPlayer.getEyeLocation().getDirection();
-        Predicate<org.bukkit.entity.Entity> filter = entity -> !entity.equals(bukkitPlayer);
-        double reach = this.playerConnection.getPlayer().getGameMode() == GameMode.CREATIVE ? 4.5 : 3;
+        Predicate<org.bukkit.entity.Entity> filter = entity -> !entity.equals(bukkitPlayer) && entity instanceof LivingEntity;
+        double reach = playerConnection.getPlayer().getGameMode() == GameMode.CREATIVE ? 4.5 : 3;
 
         RayTraceResult trace = world.rayTrace(eyePos, eyeDirection, reach, FluidCollisionMode.NEVER, true, 0, filter);
         if (trace == null) return null;
@@ -127,20 +217,20 @@ public class DummyPlayer extends EntityPlayer {
     }
 
     public void attack(Entity entity) {
-        this.attack(((CraftEntity) entity).getHandle());
+        attack(((CraftEntity) entity).getHandle());
     }
 
     public void remove(String reason) {
-        this.dropInventory();
-        this.playerConnection.disconnect(reason);
-        dummyNames.remove(this.getName());
+        dropInventory();
+        playerConnection.disconnect(reason);
+        dummyNames.remove(getName());
         dummies.remove(this);
     }
 
     @Override
     public void die(DamageSource damagesource) {
         super.die(damagesource);
-        this.server.a(new TickTask(this.server.ai(), () -> remove("Died")));
+        server.a(new TickTask(server.ai(), () -> remove("Died")));
     }
 
 }
