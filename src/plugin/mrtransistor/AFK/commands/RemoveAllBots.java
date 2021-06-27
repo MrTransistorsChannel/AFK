@@ -1,4 +1,5 @@
-/*   Plugin that adds server-side bots
+/*
+ *  Plugin that adds server-side bots
  *
  *   Copyright (C) 2021  MrTransistor
  *
