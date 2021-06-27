@@ -25,16 +25,20 @@ public class AFKUtils implements TabExecutor {
                             else if(args[2].equalsIgnoreCase("toggle")) {
                                 if(args.length >= 4){
                                     if(args[3].equalsIgnoreCase("selfDefence")){
-                                        dummy.setSelfDefending(!dummy.getSelfDefending());
-                                        sender.sendMessage(ChatColor.GREEN + "Self defence is toggled " + ChatColor.DARK_GREEN + (dummy.getSelfDefending() ? "ON" : "OFF"));
+                                        dummy.setSelfDefending(!dummy.isSelfDefending());
+                                        sender.sendMessage(ChatColor.GREEN + "Self defence is toggled " + ChatColor.DARK_GREEN + (dummy.isSelfDefending() ? "ON" : "OFF"));
                                     }
                                     else if(args[3].equalsIgnoreCase("attackContinuous")){
-                                        dummy.setAttackingContinuous(!dummy.getAttackingContinuous());
-                                        sender.sendMessage(ChatColor.GREEN + "Continuous attacking is toggled " + ChatColor.DARK_GREEN + (dummy.getAttackingContinuous() ? "ON" : "OFF"));
+                                        dummy.setAttackingContinuous(!dummy.isAttackingContinuous());
+                                        sender.sendMessage(ChatColor.GREEN + "Continuous attacking is toggled " + ChatColor.DARK_GREEN + (dummy.isAttackingContinuous() ? "ON" : "OFF"));
                                     }
                                     else if(args[3].equalsIgnoreCase("setForcePoI")){
-                                        dummy.setForcePoI(!dummy.getForcePoI());
-                                        sender.sendMessage(ChatColor.GREEN + "Force point of interest is toggled " + ChatColor.DARK_GREEN + (dummy.getForcePoI() ? "ON" : "OFF"));
+                                        dummy.setForcePoI(!dummy.isForcePoI());
+                                        sender.sendMessage(ChatColor.GREEN + "Force point of interest is toggled " + ChatColor.DARK_GREEN + (dummy.isForcePoI() ? "ON" : "OFF"));
+                                    }
+                                    else if(args[3].equalsIgnoreCase("ticking")){
+                                        dummy.setTicking(!dummy.isTicking());
+                                        sender.sendMessage(ChatColor.GREEN + "Entity ticking is " + ChatColor.DARK_GREEN + (dummy.isTicking() ? "enabled" : "disabled"));
                                     }
                                     return true;
                                 }
@@ -45,9 +49,7 @@ public class AFKUtils implements TabExecutor {
                         else return false;
                     }
                 }
-                if(!botFound){
-                    sender.sendMessage(ChatColor.RED + "There is no bot with name '" + ChatColor.DARK_GREEN + args[1] + ChatColor.RED + "'");
-                }
+                sender.sendMessage(ChatColor.RED + "There is no bot with name '" + ChatColor.DARK_GREEN + args[1] + ChatColor.RED + "'");
                 return true;
             }
             else return false;
@@ -79,6 +81,7 @@ public class AFKUtils implements TabExecutor {
                         tabCompletion.add("selfDefence");
                         tabCompletion.add("attackContinuous");
                         tabCompletion.add("setForcePoI");
+                        tabCompletion.add("ticking");
                     }
                 }
         }

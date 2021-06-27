@@ -44,6 +44,7 @@ public class DummyPlayer extends EntityPlayer {
     private boolean isAttackingContinuous = false;
     private boolean isForcePoI = false;
     private boolean aware = false;
+    private boolean isTicking = true;
     private Location PoI_loc;
     private float[] PoI_yawpitch = new float[2];
 
@@ -91,7 +92,9 @@ public class DummyPlayer extends EntityPlayer {
 
     @Override
     public void tick() {
-        if(isSelfDefending) selfDefence();
+        if(!isTicking) return;
+        if(isForcePoI) goToPoI();
+        selfDefence();
         if(isAttackingContinuous) attackContinuous();
 
         //getBukkitEntity().getServer().getLogger().info("");
@@ -102,7 +105,7 @@ public class DummyPlayer extends EntityPlayer {
         }
 
         super.tick();
-        this.playerTick();
+        playerTick();
     }
 
     public void attackOnce() {
@@ -113,11 +116,19 @@ public class DummyPlayer extends EntityPlayer {
         swingHand(EnumHand.MAIN_HAND);
     }
 
+    public void setTicking(boolean state){
+        isTicking = state;
+    }
+
+    public boolean isTicking(){
+        return isTicking;
+    }
+
     public void setAttackingContinuous(boolean state){
         isAttackingContinuous = state;
     }
 
-    public boolean getAttackingContinuous(){
+    public boolean isAttackingContinuous(){
         return isAttackingContinuous;
     }
 
@@ -125,7 +136,7 @@ public class DummyPlayer extends EntityPlayer {
         isSelfDefending = state;
     }
 
-    public boolean getSelfDefending(){
+    public boolean isSelfDefending(){
         return isSelfDefending;
     }
 
@@ -139,7 +150,7 @@ public class DummyPlayer extends EntityPlayer {
 
     }
 
-    public boolean getForcePoI(){
+    public boolean isForcePoI(){
         return isForcePoI;
     }
 
@@ -156,7 +167,7 @@ public class DummyPlayer extends EntityPlayer {
     private void selfDefence() {
         EntityLiving damager = getLastDamager();
 
-        if (damager == null){
+        if (damager == null || !isSelfDefending){
             if(aware){
                 Vector toTarget = getBukkitEntity().getEyeLocation().toVector().subtract(PoI_loc.toVector()).normalize();
                 float yaw = (float) Math.atan2(toTarget.getX(), -toTarget.getZ());
@@ -197,6 +208,12 @@ public class DummyPlayer extends EntityPlayer {
         if (getAttackCooldown(0.5f) == 1 && target != null && target.getUniqueId().equals(damager.getUniqueID())) {
             attack(target);
             swingHand(EnumHand.MAIN_HAND);
+        }
+    }
+
+    private void goToPoI(){
+        if(PoI_loc.distance(getBukkitEntity().getEyeLocation()) > 0.1){
+            aware = true;
         }
     }
 
