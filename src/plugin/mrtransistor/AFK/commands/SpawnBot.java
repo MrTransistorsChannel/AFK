@@ -18,6 +18,7 @@
  */
 package plugin.mrtransistor.AFK.commands;
 
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -41,10 +42,16 @@ public class SpawnBot implements TabExecutor {
             if (!DummyPlayer.dummyNames.contains(args[0])) {
                 DummyPlayer dummy = DummyPlayer.spawnBot(args[0], ((Player) sender).getLocation(), (Player) sender);
 
-                sender.sendMessage("Bot '" + ChatColor.DARK_GREEN + args[0] + ChatColor.RESET + "' with UUID:["
-                        + ChatColor.GOLD + dummy.getUniqueIDString() + ChatColor.RESET + "] spawned");
-            }
-            else {
+                String json = "[{\"text\":\"Bot '\", \"color\":\"white\"}," +
+                        "{\"text\":\"" + dummy.getName() + "\", \"color\":\"dark_green\"}," +
+                        "{\"text\":\"' with UUID:[\", \"color\":\"white\"}," +
+                        "{\"text\":\"" + dummy.getUniqueIDString() + "\", \"color\":\"gold\"," +
+                        " \"clickEvent\":{\"action\":\"copy_to_clipboard\",\"value\":\"" + dummy.getUniqueIDString() + "\"}," +
+                        " \"hoverEvent\":{\"action\":\"show_text\", \"value\":\"Click to copy to clipboard\"}}," +
+                        "{\"text\":\"] spawned\", \"color\":\"white\"}]";
+
+                Bukkit.dispatchCommand(sender, "tellraw " + sender.getName() + " " + json);
+            } else {
                 sender.sendMessage(ChatColor.RED + "Bot with name '" + ChatColor.DARK_GREEN + args[0] + ChatColor.RED + "' already exists");
             }
             return true;
