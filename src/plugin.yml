@@ -5,6 +5,7 @@ main: plugin.mrtransistor.AFK.AFK
 commands:
   AFKUtils:
     usage: "Usage: /afkutils controlbot <name>"
+    description: "Allows players to control bots"
   spawnBot:
     usage: "Usage: /spawnbot <name>"
     description: "Spawns an EntityPlayer, that can be controlled from within the plugin and acts as a player, allowing loading mobs and random ticking"
