@@ -15,4 +15,4 @@ commands:
   removeAllBots:
     usage: "Usage: /removeallbots"
     description: "Removes all bots"
-api-version: 1.16
+api-version: 1.17
