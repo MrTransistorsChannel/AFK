@@ -21,20 +21,19 @@ package plugin.mrtransistor.AFK;
 import io.netty.channel.*;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-
-import net.minecraft.server.v1_16_R3.EnumProtocolDirection;
-import net.minecraft.server.v1_16_R3.NetworkManager;
-import net.minecraft.server.v1_16_R3.Packet;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.protocol.EnumProtocolDirection;
+import net.minecraft.network.protocol.Packet;
 
 import java.net.SocketAddress;
 
 public class DummyNetworkManager extends NetworkManager {
 
     public DummyNetworkManager() {
-        super(EnumProtocolDirection.SERVERBOUND);
+        super(EnumProtocolDirection.b);
 
-        this.channel = new EmptyNettyChannel(null);
-        this.socketAddress = new SocketAddress() {
+        this.k = new EmptyNettyChannel(null);
+        this.l = new SocketAddress() {
         };
     }
 
@@ -53,7 +52,7 @@ public class DummyNetworkManager extends NetworkManager {
         /* do nothing */
     }
 
-    public class EmptyNettyChannel extends AbstractChannel {
+    public static class EmptyNettyChannel extends AbstractChannel {
         private final ChannelConfig config = new DefaultChannelConfig(this);
 
         public EmptyNettyChannel(Channel parent) {

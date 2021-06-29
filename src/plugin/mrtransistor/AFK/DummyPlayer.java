@@ -20,13 +20,27 @@ package plugin.mrtransistor.AFK;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
-import net.minecraft.server.v1_16_R3.*;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.protocol.game.PacketPlayOutEntityMetadata;
+import net.minecraft.network.protocol.game.PacketPlayOutNamedEntitySpawn;
+import net.minecraft.network.protocol.game.PacketPlayOutPlayerInfo;
+import net.minecraft.network.syncher.DataWatcherObject;
+import net.minecraft.network.syncher.DataWatcherRegistry;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.TickTask;
+import net.minecraft.server.level.EntityPlayer;
+import net.minecraft.server.level.WorldServer;
+import net.minecraft.server.network.PlayerConnection;
+import net.minecraft.world.EnumHand;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EntityLiving;
+import net.minecraft.world.phys.Vec3D;
 import org.bukkit.*;
 import org.bukkit.World;
-import org.bukkit.craftbukkit.v1_16_R3.CraftServer;
-import org.bukkit.craftbukkit.v1_16_R3.CraftWorld;
-import org.bukkit.craftbukkit.v1_16_R3.entity.CraftEntity;
-import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_17_R1.CraftServer;
+import org.bukkit.craftbukkit.v1_17_R1.CraftWorld;
+import org.bukkit.craftbukkit.v1_17_R1.entity.CraftEntity;
+import org.bukkit.craftbukkit.v1_17_R1.entity.CraftPlayer;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -47,7 +61,7 @@ public class DummyPlayer extends EntityPlayer {
     private boolean aware = false;
     private boolean isTicking = true;
     private Location PoI_loc;
-    private float[] PoI_yawpitch = new float[2];
+    private final float[] PoI_yawpitch = new float[2];
 
     private static String[] getSkin(EntityPlayer entityPlayer) {
         GameProfile gameProfile = entityPlayer.getProfile();
@@ -57,8 +71,8 @@ public class DummyPlayer extends EntityPlayer {
         return new String[]{texture, signature};
     }
 
-    public DummyPlayer(MinecraftServer server, WorldServer world, GameProfile profile, PlayerInteractManager interactManager) {
-        super(server, world, profile, interactManager);
+    public DummyPlayer(MinecraftServer server, WorldServer world, GameProfile profile) {
+        super(server, world, profile);
         dummyNames.add(getName());
         dummies.add(this);
     }
@@ -69,14 +83,14 @@ public class DummyPlayer extends EntityPlayer {
         NetworkManager networkManager = new DummyNetworkManager();
 
         GameProfile gameProfile = new GameProfile(UUID.randomUUID(), name);
-        DummyPlayer dummy = new DummyPlayer(server, worldServer, gameProfile, new PlayerInteractManager(worldServer));
+        DummyPlayer dummy = new DummyPlayer(server, worldServer, gameProfile);
 
         String[] texSign = getSkin(((CraftPlayer) spawner).getHandle());
         gameProfile.getProperties().put("textures", new Property("textures", texSign[0], texSign[1]));
 
-        dummy.getDataWatcher().set(new DataWatcherObject<>(16, DataWatcherRegistry.a), (byte) 0x7f); // show all model layers
+        dummy.getDataWatcher().set(new DataWatcherObject<>(17, DataWatcherRegistry.a), (byte) 0x7f); // show all model layers
 
-        dummy.playerConnection = new PlayerConnection(server, networkManager, dummy);
+        dummy.b = new PlayerConnection(server, networkManager, dummy);
         worldServer.addPlayerJoin(dummy);
 
         dummy.setLocation(location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
@@ -85,7 +99,7 @@ public class DummyPlayer extends EntityPlayer {
         worldServer.getChunkProvider().movePlayer(dummy);
 
 
-        server.getPlayerList().sendAll(new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.ADD_PLAYER, dummy));
+        server.getPlayerList().sendAll(new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.a, dummy));
         server.getPlayerList().sendAll(new PacketPlayOutNamedEntitySpawn(dummy));
         server.getPlayerList().sendAll(new PacketPlayOutEntityMetadata(dummy.getId(), dummy.getDataWatcher(), true));
         return dummy;
@@ -100,8 +114,8 @@ public class DummyPlayer extends EntityPlayer {
 
         //getBukkitEntity().getServer().getLogger().info("");
 
-        if (server.ai() % 10 == 0) {
-            playerConnection.syncPosition();
+        if (getMinecraftServer().ai() % 10 == 0) {
+            b.syncPosition();
             getWorldServer().getChunkProvider().movePlayer(this);
         }
         super.tick();
@@ -113,7 +127,7 @@ public class DummyPlayer extends EntityPlayer {
         if (getAttackCooldown(0.5f) == 1 && target != null) {
             attack(target);
         }
-        swingHand(EnumHand.MAIN_HAND);
+        swingHand(EnumHand.a);
     }
 
     public void setTicking(boolean state){
@@ -159,7 +173,7 @@ public class DummyPlayer extends EntityPlayer {
             LivingEntity target = getTargetedLivingEntity();
             if (getAttackCooldown(0.5f) == 1 && target != null) {
                 attack(target);
-                swingHand(EnumHand.MAIN_HAND);
+                swingHand(EnumHand.a);
             }
         }
     }
@@ -207,7 +221,7 @@ public class DummyPlayer extends EntityPlayer {
         LivingEntity target = getTargetedLivingEntity();
         if (getAttackCooldown(0.5f) == 1 && target != null && target.getUniqueId().equals(damager.getUniqueID())) {
             attack(target);
-            swingHand(EnumHand.MAIN_HAND);
+            swingHand(EnumHand.a);
         }
     }
 
@@ -223,7 +237,7 @@ public class DummyPlayer extends EntityPlayer {
         Location eyePos = bukkitPlayer.getEyeLocation();
         Vector eyeDirection = bukkitPlayer.getEyeLocation().getDirection();
         Predicate<org.bukkit.entity.Entity> filter = entity -> !entity.equals(bukkitPlayer) && entity instanceof LivingEntity;
-        double reach = playerConnection.getPlayer().getGameMode() == GameMode.CREATIVE ? 4.5 : 3;
+        double reach = b.b.getBukkitEntity().getGameMode() == GameMode.CREATIVE ? 4.5 : 3;
 
         RayTraceResult trace = world.rayTrace(eyePos, eyeDirection, reach, FluidCollisionMode.NEVER, true, 0, filter);
         if (trace == null) return null;
@@ -239,7 +253,7 @@ public class DummyPlayer extends EntityPlayer {
 
     public void remove(String reason) {
         dropInventory();
-        playerConnection.disconnect(reason);
+        b.disconnect(reason);
         dummyNames.remove(getName());
         dummies.remove(this);
     }
@@ -247,7 +261,7 @@ public class DummyPlayer extends EntityPlayer {
     @Override
     public void die(DamageSource damagesource) {
         super.die(damagesource);
-        server.a(new TickTask(server.ai(), () -> remove("Died")));
+        getMinecraftServer().a(new TickTask(getMinecraftServer().ai(), () -> remove("Died")));
     }
 
 }

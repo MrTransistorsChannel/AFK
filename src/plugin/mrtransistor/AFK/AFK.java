@@ -18,11 +18,14 @@
  */
 package plugin.mrtransistor.AFK;
 
-import net.minecraft.server.v1_16_R3.*;
+import net.minecraft.network.protocol.game.PacketPlayOutEntityMetadata;
+import net.minecraft.network.protocol.game.PacketPlayOutNamedEntitySpawn;
+import net.minecraft.network.protocol.game.PacketPlayOutPlayerInfo;
+import net.minecraft.server.network.PlayerConnection;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.craftbukkit.v1_16_R3.entity.CraftEntity;
-import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_17_R1.entity.CraftEntity;
+import org.bukkit.craftbukkit.v1_17_R1.entity.CraftPlayer;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
@@ -89,9 +92,9 @@ public class AFK extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
-        PlayerConnection plc = ((CraftPlayer) e.getPlayer()).getHandle().playerConnection;
+        PlayerConnection plc = ((CraftPlayer) e.getPlayer()).getHandle().b;
         for (DummyPlayer dummy : DummyPlayer.dummies) {
-            plc.sendPacket(new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.ADD_PLAYER,
+            plc.sendPacket(new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.a,
                     dummy));
             plc.sendPacket(new PacketPlayOutNamedEntitySpawn(dummy));
             plc.sendPacket(new PacketPlayOutEntityMetadata(dummy.getId(),
