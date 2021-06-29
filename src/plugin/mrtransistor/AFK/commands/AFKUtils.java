@@ -32,10 +32,8 @@ public class AFKUtils implements TabExecutor {
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if(args.length >= 1 && args[0].equalsIgnoreCase("controlBot")){
             if(args.length >= 2) {
-                boolean botFound = false;
                 for (DummyPlayer dummy : DummyPlayer.dummies) {
                     if (dummy.getName().equals(args[1])) {
-                        botFound = true;
                         if(args.length >= 3) {
                             if (args[2].equalsIgnoreCase("attackOnce")) {
                                 dummy.attackOnce();
