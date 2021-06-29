@@ -1,5 +1,5 @@
 name: AFK
-version: 2.4
+version: 2.3
 author: MrTransistor
 main: plugin.mrtransistor.AFK.AFK
 commands:
@@ -15,4 +15,4 @@ commands:
   removeAllBots:
     usage: "Usage: /removeallbots"
     description: "Removes all bots"
-api-version: 1.17
+api-version: 1.16
