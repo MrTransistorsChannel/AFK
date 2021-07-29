@@ -112,9 +112,8 @@ public class DummyPlayer extends EntityPlayer {
         selfDefence();
         if(isAttackingContinuous) attackContinuous();
 
-        //getBukkitEntity().getServer().getLogger().info("");
 
-        if (getMinecraftServer().ai() % 10 == 0) {
+        if (getMinecraftServer().ah() % 10 == 0) {
             b.syncPosition();
             getWorldServer().getChunkProvider().movePlayer(this);
         }
@@ -261,7 +260,7 @@ public class DummyPlayer extends EntityPlayer {
     @Override
     public void die(DamageSource damagesource) {
         super.die(damagesource);
-        getMinecraftServer().a(new TickTask(getMinecraftServer().ai(), () -> remove("Died")));
+        getMinecraftServer().a(new TickTask(getMinecraftServer().ah(), () -> remove("Died")));
     }
 
 }
