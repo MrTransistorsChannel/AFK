@@ -1,0 +1,54 @@
+plugins { id 'java-library' }
+apply from: rootProject.file('specialSource.gradle')
+
+version = '2.6.1'
+group = 'ru.tulavcube.AFK'
+
+ext {
+    spigotVersion = '1.18.1-R0.1-SNAPSHOT'
+    remapServerCode = true
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven {
+        url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+
+        // As of Gradle 5.1, you can limit this to only those
+        // dependencies you expect from it
+        content {
+            includeGroup 'org.bukkit'
+            includeGroup 'org.spigotmc'
+        }
+    }
+
+    maven { url = 'https://oss.sonatype.org/content/repositories/snapshots' }
+    maven { url = 'https://oss.sonatype.org/content/repositories/central' }
+    maven { url = 'https://libraries.minecraft.net/' }
+}
+
+dependencies {
+    afterEvaluate {
+        if (remapServerCode) {
+            implementation "org.spigotmc:spigot:${spigotVersion}:remapped-mojang"
+        } else {
+            implementation "org.spigotmc:spigot:${spigotVersion}"
+        }
+    }
+}
+
+afterEvaluate {
+    if (remapServerCode) {
+        jar {
+            doLast {
+                def outputFiles = outputs.files.files
+                for (inputFile in outputFiles) {
+                    File intermediateFile = new File(temporaryDir, inputFile.name.replace('.jar', '-obf.jar'))
+                    File outputFile = inputFile
+                    remapMojangToSpigot(inputFile, intermediateFile, outputFile, spigotVersion)
+                }
+            }
+        }
+    }
+}
