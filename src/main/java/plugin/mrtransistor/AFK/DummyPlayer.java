@@ -20,22 +20,17 @@ package plugin.mrtransistor.AFK;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
-import net.minecraft.network.Connection;
-import net.minecraft.network.protocol.game.ClientboundAddPlayerPacket;
-import net.minecraft.network.protocol.game.ClientboundPlayerInfoPacket;
-import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
-import net.minecraft.network.syncher.EntityDataAccessor;
-import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
 import org.bukkit.*;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.craftbukkit.v1_18_R1.CraftServer;
 import org.bukkit.craftbukkit.v1_18_R1.CraftWorld;
 import org.bukkit.craftbukkit.v1_18_R1.entity.CraftEntity;
@@ -44,10 +39,13 @@ import org.bukkit.craftbukkit.v1_18_R1.entity.CraftPlayer;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ExperienceOrb;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -65,7 +63,6 @@ public class DummyPlayer extends ServerPlayer {
 
     private static String[] getSkin(ServerPlayer player) {
         GameProfile gameProfile = player.getGameProfile();
-        //### ДОБАВИТЬ ПРОВЕРКУ ОТСУТСТВИЯ СКИНА
         if (!gameProfile.getProperties().containsKey("textures")) return null;
         Property property = gameProfile.getProperties().get("textures").iterator().next();
         String texture = property.getValue();
@@ -79,47 +76,81 @@ public class DummyPlayer extends ServerPlayer {
         dummies.add(this);
     }
 
-    public static DummyPlayer spawnBot(String name, Location location, org.bukkit.entity.Player spawner) {
+    public static DummyPlayer spawnBot(String name, Location location, org.bukkit.entity.Player spawner) { // some of this crap is redundant but it works
+        //TODO: check userCache for existing bots, update skin if spawner is not null (as it will be on server restart)
         MinecraftServer server = ((CraftServer) (Bukkit.getServer())).getServer();
         ServerLevel world = ((CraftWorld) location.getWorld()).getHandle();
-        Connection conn = new DummyConnection();
 
         GameProfile gameProfile = new GameProfile(UUID.randomUUID(), name);
         DummyPlayer dummy = new DummyPlayer(server, world, gameProfile);
 
-        String[] texSign = getSkin(((CraftPlayer) spawner).getHandle());
+        String[] texSign = null;
+        if (spawner != null)
+            texSign = getSkin(((CraftPlayer) spawner).getHandle());
 
         if (texSign != null)
             gameProfile.getProperties().put("textures", new Property("textures", texSign[0], texSign[1]));
 
-        dummy.getEntityData().set(new EntityDataAccessor<>(17, EntityDataSerializers.BYTE), (byte) 0x7f); // show all model layers
+        server.getPlayerList().placeNewPlayer(new DummyConnection(), dummy);
 
-        dummy.connection = new ServerGamePacketListenerImpl(server, conn, dummy);
-        world.addNewPlayer(dummy);
+        new BukkitRunnable() {
 
-        dummy.forceSetPositionRotation(location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
-        dummy.setYHeadRot(location.getYaw());
-        world.getChunkSource().move(dummy);
+            @Override
+            public void run() { // Fix for Paper`s post-chunk-load player join
+                dummy.connection.tick();
+            }
+        }.runTaskLater(server.server.getPluginManager().getPlugin("AFK"), 2);
 
-        server.getPlayerList().broadcastAll(new ClientboundPlayerInfoPacket(ClientboundPlayerInfoPacket.Action.ADD_PLAYER, dummy));
-        server.getPlayerList().broadcastAll(new ClientboundAddPlayerPacket(dummy));
-        server.getPlayerList().broadcastAll(new ClientboundSetEntityDataPacket(dummy.getId(), dummy.getEntityData(), true));
+        dummy.teleportTo(world, location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
+        dummy.setHealth(20.0F);
+        dummy.unsetRemoved();
+        dummy.setGameMode(GameType.SURVIVAL);
+        dummy.getEntityData().set(DATA_PLAYER_MODE_CUSTOMISATION, (byte) 0xf7);
+
+        //TODO: move to AFK#onDisable();
+        AFK _plg = (AFK) Bukkit.getServer().getPluginManager().getPlugin("AFK");
+        FileConfiguration botSaveYml = _plg.getBotSaveFile();
+        Map<String, Object> botCoords = new HashMap<>();
+        if (spawner != null)
+            botCoords.put("spawner", spawner.getUniqueId().toString());
+        botCoords.put("level", dummy.getBukkitEntity().getLocation().getWorld().getName());
+        botCoords.put("x", dummy.getBukkitEntity().getLocation().getX());
+        botCoords.put("y", dummy.getBukkitEntity().getLocation().getY());
+        botCoords.put("z", dummy.getBukkitEntity().getLocation().getZ());
+        botCoords.put("yaw", dummy.getBukkitEntity().getLocation().getYaw());
+        botCoords.put("pitch", dummy.getBukkitEntity().getLocation().getPitch());
+        botSaveYml.createSection(dummy.getBukkitEntity().getName(), botCoords);
+        _plg.saveBotSaveFile();
         return dummy;
     }
 
     @Override
-    public void tick() {
+    public void tick() { // some of this crap is not necessary but it works
         if (!isTicking) return;
-        super.tick();
-        if (getServer().getTickCount() % 10 == 0) {
-            connection.resetPosition();
+        super.tick(); // handle gamemode and inventory
+        doTick(); // update health, air and other levels
+
+        if (getServer().getTickCount() % 10 == 0) { // update position in chunks
+            connection.resetPosition(); // maybe not necessary?
             getLevel().getChunkSource().move(this);
         }
-        doTick();
 
         if (isForcePoI) goToPoI();
         selfDefence();
         if (isAttackingContinuous) attackContinuous();
+
+        /*if (getServer().getTickCount() % 100 == 0) {
+            CraftPlayer bukkitEntity = getBukkitEntity();
+            if (bukkitEntity.getItemInHand().getType().equals(Material.BOW)) {
+                startUsingItem(InteractionHand.MAIN_HAND);
+                bukkitEntity.launchProjectile(Arrow.class);
+            } else if (bukkitEntity.getItemInHand().getType().equals(Material.SNOWBALL)) {
+                startUsingItem(InteractionHand.MAIN_HAND);
+                bukkitEntity.launchProjectile(Snowball.class);
+            }
+        }
+        System.out.println(getUseItemRemainingTicks());*/
+
     }
 
     public void attackOnce() {
@@ -258,9 +289,19 @@ public class DummyPlayer extends ServerPlayer {
         Location xpLoc = bEntity.getLocation();
         int xp = bEntity.getTotalExperience();
         connection.disconnect(reason);
+        xpWorld.spawn(xpLoc, ExperienceOrb.class).setExperience(xp);
         dummyNames.remove(getName().getContents());
         dummies.remove(this);
-        xpWorld.spawn(xpLoc, ExperienceOrb.class).setExperience(xp);
+        AFK _plg = (AFK) Bukkit.getServer().getPluginManager().getPlugin("AFK");
+        FileConfiguration botSaveYml = _plg.getBotSaveFile();
+        botSaveYml.set(bEntity.getName(), null);
+        _plg.saveBotSaveFile();
+    }
+
+    public void softRemove() {
+        connection.disconnect("soft removed");
+        dummyNames.remove(getName().getContents());
+        dummies.remove(this);
     }
 
     @Override

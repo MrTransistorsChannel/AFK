@@ -1,12 +1,18 @@
-plugins { id 'java-library' }
+plugins {
+    id 'java-library'
+}
 apply from: rootProject.file('specialSource.gradle')
 
 version = '2.6.1'
-group = 'ru.tulavcube.AFK'
+group = 'plugin.mrtransistor.AFK'
 
 ext {
+    author = 'MrTransistor'
     spigotVersion = '1.18.1-R0.1-SNAPSHOT'
     remapServerCode = true
+
+    mainClass = group + '.' + rootProject.getName()
+    apiVersion = spigotVersion.split('\\.')[0] + '.' + spigotVersion.split('\\.')[1]
 }
 
 repositories {
@@ -50,5 +56,15 @@ afterEvaluate {
                 }
             }
         }
+    }
+}
+
+processResources {
+    def props = [name         : rootProject.name, version: version, author: author,
+                 mainClassPath: mainClass, apiVersion: apiVersion]
+    inputs.properties props
+    filteringCharset 'UTF-8'
+    filesMatching('plugin.yml') {
+        expand props
     }
 }

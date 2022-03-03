@@ -18,70 +18,113 @@
  */
 package plugin.mrtransistor.AFK;
 
-import net.minecraft.network.protocol.game.ClientboundAddPlayerPacket;
-import net.minecraft.network.protocol.game.ClientboundPlayerInfoPacket;
-import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.configuration.InvalidConfigurationException;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.craftbukkit.v1_18_R1.entity.CraftEntity;
-import org.bukkit.craftbukkit.v1_18_R1.entity.CraftPlayer;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
-import plugin.mrtransistor.AFK.commands.AFKUtils;
-import plugin.mrtransistor.AFK.commands.RemoveAllBots;
-import plugin.mrtransistor.AFK.commands.RemoveBot;
-import plugin.mrtransistor.AFK.commands.SpawnBot;
+import plugin.mrtransistor.AFK.commands.CommandDispatcher;
+
+import java.io.File;
+import java.io.IOException;
 
 public class AFK extends JavaPlugin implements Listener {
+
+    private File botSaveFile;
+    private FileConfiguration botSaveYml;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        createBotSaveFile();
 
         Bukkit.getPluginManager().registerEvents(this, this);
+        CommandDispatcher commandDispatcher = new CommandDispatcher(this);
 
-        getCommand("spawnBot").setExecutor(new SpawnBot());
-        getCommand("spawnBot").setTabCompleter(new SpawnBot());
-        getCommand("removeBot").setExecutor(new RemoveBot());
-        getCommand("removeBot").setTabCompleter(new RemoveBot());
-        getCommand("removeAllBots").setExecutor(new RemoveAllBots());
-        getCommand("removeAllBots").setTabCompleter(new RemoveAllBots());
-        getCommand("afkutils").setExecutor(new AFKUtils());
-        getCommand("afkutils").setTabCompleter(new AFKUtils());
+        getCommand("spawnBot").setExecutor(commandDispatcher);
+        getCommand("spawnBot").setTabCompleter(commandDispatcher);
+        getCommand("removeBot").setExecutor(commandDispatcher);
+        getCommand("removeBot").setTabCompleter(commandDispatcher);
+        getCommand("removeAllBots").setExecutor(commandDispatcher);
+        getCommand("removeAllBots").setTabCompleter(commandDispatcher);
+        getCommand("afkutils").setExecutor(commandDispatcher);
+        getCommand("afkutils").setTabCompleter(commandDispatcher);
+
+        spawnBotsOnLoad();
 
         getLogger().info("AFK plugin started!");
     }
 
     @Override
     public void onDisable() {
+        removeBotsOnUnload();
+        getLogger().info("AFK plugin stopped!");
+    }
+
+    private void spawnBotsOnLoad() {
+        int bots_spawned = 0;
+        for (String name : botSaveYml.getKeys(false)) {
+            /*Player spawner = (Player) getServer().getOfflinePlayer(UUID.fromString(botSaveYml.getConfigurationSection(name)
+                    .getString("spawner")));*/
+            World world = getServer().getWorld(botSaveYml.getConfigurationSection(name).getString("level"));
+            double x = botSaveYml.getConfigurationSection(name).getDouble("x");
+            double y = botSaveYml.getConfigurationSection(name).getDouble("y");
+            double z = botSaveYml.getConfigurationSection(name).getDouble("z");
+            float yaw = (float) botSaveYml.getConfigurationSection(name).getDouble("yaw");
+            float pitch = (float) botSaveYml.getConfigurationSection(name).getDouble("pitch");
+            Location location = new Location(world, x, y, z, yaw, pitch);
+            DummyPlayer.spawnBot(name, location, null);
+        }
+    }
+
+    private void removeBotsOnUnload() {
         int botsRemoved = 0;
         int numBots = DummyPlayer.dummies.size();
         for (int i = 0; i < numBots; i++) {
             DummyPlayer dummy = DummyPlayer.dummies.get(0);
             getLogger().info("Bot '" + ChatColor.DARK_GREEN + dummy.getName().getContents() + ChatColor.RESET + "' with UUID:["
                     + ChatColor.GOLD + dummy.getStringUUID() + ChatColor.RESET + "] was removed");
-            dummy.remove("Plugin stopped");
+            dummy.softRemove();
             botsRemoved++;
         }
         if (botsRemoved == 0) getLogger().info(ChatColor.GREEN + "No bots were removed");
         else if (botsRemoved == 1)
             getLogger().info(ChatColor.GREEN + "1 bot was removed");
         else getLogger().info(ChatColor.GREEN + Integer.toString(botsRemoved) + " bots were removed");
-        getLogger().info("AFK plugin stopped!");
     }
 
-    @EventHandler
-    public void onJoin(PlayerJoinEvent e) {
-        ServerGamePacketListenerImpl plc = ((CraftPlayer) e.getPlayer()).getHandle().connection;
-        for (DummyPlayer dummy : DummyPlayer.dummies) {
-            plc.send(new ClientboundPlayerInfoPacket(ClientboundPlayerInfoPacket.Action.ADD_PLAYER, dummy));
-            plc.send(new ClientboundAddPlayerPacket(dummy));
-            plc.send(new ClientboundSetEntityDataPacket(dummy.getId(), dummy.getEntityData(), true));
+    private void createBotSaveFile() {
+        botSaveFile = new File(getDataFolder(), "botSave.yml");
+        if (!botSaveFile.exists()) {
+            botSaveFile.getParentFile().mkdirs();
+            saveResource("botSave.yml", false);
+        }
+
+        botSaveYml = new YamlConfiguration();
+        try {
+            botSaveYml.load(botSaveFile);
+        } catch (IOException | InvalidConfigurationException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public FileConfiguration getBotSaveFile() {
+        return botSaveYml;
+    }
+
+    public void saveBotSaveFile() {
+        try {
+            botSaveYml.save(botSaveFile);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
