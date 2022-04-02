@@ -18,25 +18,23 @@
  */
 package plugin.mrtransistor.AFK;
 
+import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.properties.Property;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.World;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.craftbukkit.v1_18_R1.entity.CraftEntity;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.entity.FoodLevelChangeEvent;
-import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import plugin.mrtransistor.AFK.commands.CommandDispatcher;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
-public class AFK extends JavaPlugin implements Listener {
+public class AFK extends JavaPlugin {
 
     private File botSaveFile;
     private FileConfiguration botSaveYml;
@@ -44,64 +42,65 @@ public class AFK extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        createBotSaveFile();
+        loadBotSaveFile();
 
-        Bukkit.getPluginManager().registerEvents(this, this);
         CommandDispatcher commandDispatcher = new CommandDispatcher(this);
+        EventListener eventListener = new EventListener();
+        Bukkit.getPluginManager().registerEvents(eventListener, this);
+
 
         getCommand("spawnBot").setExecutor(commandDispatcher);
         getCommand("spawnBot").setTabCompleter(commandDispatcher);
-        getCommand("removeBot").setExecutor(commandDispatcher);
-        getCommand("removeBot").setTabCompleter(commandDispatcher);
         getCommand("removeAllBots").setExecutor(commandDispatcher);
         getCommand("removeAllBots").setTabCompleter(commandDispatcher);
         getCommand("afkutils").setExecutor(commandDispatcher);
         getCommand("afkutils").setTabCompleter(commandDispatcher);
 
-        spawnBotsOnLoad();
+        Bukkit.getScheduler().runTaskLater(this, this::loadBots, 20);
 
         getLogger().info("AFK plugin started!");
     }
 
     @Override
     public void onDisable() {
-        removeBotsOnUnload();
+        saveBots();
         getLogger().info("AFK plugin stopped!");
     }
 
-    private void spawnBotsOnLoad() {
-        int bots_spawned = 0;
-        for (String name : botSaveYml.getKeys(false)) {
-            /*Player spawner = (Player) getServer().getOfflinePlayer(UUID.fromString(botSaveYml.getConfigurationSection(name)
-                    .getString("spawner")));*/
-            World world = getServer().getWorld(botSaveYml.getConfigurationSection(name).getString("level"));
-            double x = botSaveYml.getConfigurationSection(name).getDouble("x");
-            double y = botSaveYml.getConfigurationSection(name).getDouble("y");
-            double z = botSaveYml.getConfigurationSection(name).getDouble("z");
-            float yaw = (float) botSaveYml.getConfigurationSection(name).getDouble("yaw");
-            float pitch = (float) botSaveYml.getConfigurationSection(name).getDouble("pitch");
-            Location location = new Location(world, x, y, z, yaw, pitch);
-            DummyPlayer.spawnBot(name, location, null);
+    private void loadBots() {
+        ConfigurationSection section = botSaveYml.getConfigurationSection("botsToReload");
+        if(section == null) return;
+        List<String> botsToLoad = new ArrayList<>(botSaveYml.getConfigurationSection("botsToReload").getKeys(false));
+        System.out.println("satsrtbreab");
+        if (botsToLoad.isEmpty()) return;
+        getLogger().info(ChatColor.GREEN + "Loading " + botsToLoad.size()
+                + (botsToLoad.size() == 1 ? " bot" : " bots"));
+        for (String bot : botsToLoad) {
+            DummyPlayer.spawnBot(bot, null, null, false);
         }
     }
 
-    private void removeBotsOnUnload() {
-        int botsRemoved = 0;
-        int numBots = DummyPlayer.dummies.size();
-        for (int i = 0; i < numBots; i++) {
-            DummyPlayer dummy = DummyPlayer.dummies.get(0);
-            getLogger().info("Bot '" + ChatColor.DARK_GREEN + dummy.getName().getContents() + ChatColor.RESET + "' with UUID:["
-                    + ChatColor.GOLD + dummy.getStringUUID() + ChatColor.RESET + "] was removed");
-            dummy.softRemove();
-            botsRemoved++;
+    private void saveBots() {
+        if (!DummyPlayer.dummies.isEmpty())
+            getLogger().info(ChatColor.GREEN + "Saving " + DummyPlayer.dummies.size()
+                    + (DummyPlayer.dummies.size() == 1 ? " bot" : " bots"));
+        botSaveYml.set("botsToReload", null);
+        botSaveYml.createSection("botsToReload");
+        while (!DummyPlayer.dummies.isEmpty()) {
+            DummyPlayer botToSave = DummyPlayer.dummies.get(0);
+            botSaveYml.createSection("botsToReload." + botToSave.getScoreboardName());
+            GameProfile gameProfile = botToSave.getGameProfile();
+            if(gameProfile.getProperties().containsKey("textures")) {
+                Property textures = gameProfile.getProperties().get("textures").iterator().next();
+                botSaveYml.set("botsToReload." + botToSave.getScoreboardName() + ".texture", textures.getValue().toString());
+                botSaveYml.set("botsToReload." + botToSave.getScoreboardName() + ".signature", textures.getSignature().toString());
+            }
+            botToSave.disconnect("Plugin unload");
         }
-        if (botsRemoved == 0) getLogger().info(ChatColor.GREEN + "No bots were removed");
-        else if (botsRemoved == 1)
-            getLogger().info(ChatColor.GREEN + "1 bot was removed");
-        else getLogger().info(ChatColor.GREEN + Integer.toString(botsRemoved) + " bots were removed");
+        saveBotSaveFile();
     }
 
-    private void createBotSaveFile() {
+    private void loadBotSaveFile() {
         botSaveFile = new File(getDataFolder(), "botSave.yml");
         if (!botSaveFile.exists()) {
             botSaveFile.getParentFile().mkdirs();
@@ -116,10 +115,6 @@ public class AFK extends JavaPlugin implements Listener {
         }
     }
 
-    public FileConfiguration getBotSaveFile() {
-        return botSaveYml;
-    }
-
     public void saveBotSaveFile() {
         try {
             botSaveYml.save(botSaveFile);
@@ -128,18 +123,7 @@ public class AFK extends JavaPlugin implements Listener {
         }
     }
 
-    @EventHandler
-    public void onPlayerDeath(PlayerDeathEvent e) {
-        if (((CraftEntity) e.getEntity()).getHandle() instanceof DummyPlayer) {
-            e.setDroppedExp(e.getEntity().getTotalExperience());
-        }
-    }
-
-    @EventHandler
-    public void onFoodLevelChange(FoodLevelChangeEvent e) {
-        if (((CraftEntity) e.getEntity()).getHandle() instanceof DummyPlayer) {
-            e.setCancelled(true);
-            e.getEntity().setFoodLevel(20);
-        }
+    public FileConfiguration getBotSaveYml(){
+        return botSaveYml;
     }
 }

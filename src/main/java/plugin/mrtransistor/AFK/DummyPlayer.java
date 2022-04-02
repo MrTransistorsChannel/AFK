@@ -20,39 +20,41 @@ package plugin.mrtransistor.AFK;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.PlayerList;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.bukkit.*;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.craftbukkit.v1_18_R1.CraftServer;
-import org.bukkit.craftbukkit.v1_18_R1.CraftWorld;
-import org.bukkit.craftbukkit.v1_18_R1.entity.CraftEntity;
-import org.bukkit.craftbukkit.v1_18_R1.entity.CraftLivingEntity;
-import org.bukkit.craftbukkit.v1_18_R1.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_18_R2.CraftServer;
+import org.bukkit.craftbukkit.v1_18_R2.CraftWorld;
+import org.bukkit.craftbukkit.v1_18_R2.entity.CraftEntity;
+import org.bukkit.craftbukkit.v1_18_R2.entity.CraftLivingEntity;
+import org.bukkit.craftbukkit.v1_18_R2.entity.CraftPlayer;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.ExperienceOrb;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 
 public class DummyPlayer extends ServerPlayer {
     public static ArrayList<DummyPlayer> dummies = new ArrayList<>();
-    public static ArrayList<String> dummyNames = new ArrayList<>();
-
+    public boolean isFullyConnected = false;
     private boolean isSelfDefending = false;
     private boolean isAttackingContinuous = false;
     private boolean isForcePoI = false;
@@ -61,71 +63,73 @@ public class DummyPlayer extends ServerPlayer {
     private Location PoI_loc;
     private final float[] PoI_yawpitch = new float[2];
 
-    private static String[] getSkin(ServerPlayer player) {
-        GameProfile gameProfile = player.getGameProfile();
-        if (!gameProfile.getProperties().containsKey("textures")) return null;
-        Property property = gameProfile.getProperties().get("textures").iterator().next();
-        String texture = property.getValue();
-        String signature = property.getSignature();
-        return new String[]{texture, signature};
+    private String[] getSkin(Player spawner) {
+        if (spawner != null) {
+            GameProfile gameProfile = ((CraftPlayer) spawner).getHandle().getGameProfile();
+            if (!gameProfile.getProperties().containsKey("textures")) return null;
+            Property property = gameProfile.getProperties().get("textures").iterator().next();
+            String texture = property.getValue();
+            String signature = property.getSignature();
+            return new String[]{texture, signature};
+        } else {
+            ConfigurationSection botsToReload = ((AFK) server.server.getPluginManager().getPlugin("AFK")).getBotSaveYml()
+                    .getConfigurationSection("botsToReload");
+            if(botsToReload.getKeys(false).contains(getScoreboardName())) {
+                String texture = botsToReload.getConfigurationSection(getScoreboardName()).getString("texture");
+                String signature = botsToReload.getConfigurationSection(getScoreboardName()).getString("signature");
+                if(texture != null && signature != null)
+                    return new String[]{texture, signature};
+            }
+            return null;
+        }
     }
 
     public DummyPlayer(MinecraftServer server, ServerLevel world, GameProfile profile) {
         super(server, world, profile);
-        dummyNames.add(getName().getContents());
         dummies.add(this);
     }
 
-    public static DummyPlayer spawnBot(String name, Location location, org.bukkit.entity.Player spawner) { // some of this crap is redundant but it works
-        //TODO: check userCache for existing bots, update skin if spawner is not null (as it will be on server restart)
-        MinecraftServer server = ((CraftServer) (Bukkit.getServer())).getServer();
-        ServerLevel world = ((CraftWorld) location.getWorld()).getHandle();
+    public static DummyPlayer spawnBot(String name, Location location, org.bukkit.entity.Player spawner, boolean updateStats) { // some of this crap is redundant but it works
+        MinecraftServer server = ((CraftServer) Bukkit.getServer()).getServer();
+        ServerLevel world = (location != null && location.getWorld() != null) ? ((CraftWorld) location.getWorld()).getHandle()
+                : server.getLevel(Level.OVERWORLD);
+        GameProfile gameProfile = server.getProfileCache().get(name).orElse(new GameProfile(UUID.randomUUID(), name)); // maybe needs something else?
 
-        GameProfile gameProfile = new GameProfile(UUID.randomUUID(), name);
         DummyPlayer dummy = new DummyPlayer(server, world, gameProfile);
 
-        String[] texSign = null;
-        if (spawner != null)
-            texSign = getSkin(((CraftPlayer) spawner).getHandle());
+        String[] texSign;// maybe simplify this?
+        texSign = dummy.getSkin(spawner);
 
         if (texSign != null)
             gameProfile.getProperties().put("textures", new Property("textures", texSign[0], texSign[1]));
 
+        /* spawning entity */
         server.getPlayerList().placeNewPlayer(new DummyConnection(), dummy);
 
         new BukkitRunnable() {
-
             @Override
-            public void run() { // Fix for Paper`s post-chunk-load player join
-                dummy.connection.tick();
+            public void run() { // ensuring that the bot has been connected and started ticking
+                if (!dummy.isFullyConnected) {
+                    dummy.connection.tick();
+                    return;
+                } else if (location != null && location.getWorld() != null)
+                    dummy.teleportTo(world, location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
+                this.cancel();
             }
-        }.runTaskLater(server.server.getPluginManager().getPlugin("AFK"), 2);
+        }.runTaskTimer(server.server.getPluginManager().getPlugin("AFK"), 0, 10);
 
-        dummy.teleportTo(world, location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
-        dummy.setHealth(20.0F);
-        dummy.unsetRemoved();
-        dummy.setGameMode(GameType.SURVIVAL);
+        if (updateStats) {
+            dummy.setHealth(20.0F);
+            dummy.unsetRemoved();
+            dummy.setGameMode(GameType.SURVIVAL);
+        }
         dummy.getEntityData().set(DATA_PLAYER_MODE_CUSTOMISATION, (byte) 0xf7);
-
-        //TODO: move to AFK#onDisable();
-        AFK _plg = (AFK) Bukkit.getServer().getPluginManager().getPlugin("AFK");
-        FileConfiguration botSaveYml = _plg.getBotSaveFile();
-        Map<String, Object> botCoords = new HashMap<>();
-        if (spawner != null)
-            botCoords.put("spawner", spawner.getUniqueId().toString());
-        botCoords.put("level", dummy.getBukkitEntity().getLocation().getWorld().getName());
-        botCoords.put("x", dummy.getBukkitEntity().getLocation().getX());
-        botCoords.put("y", dummy.getBukkitEntity().getLocation().getY());
-        botCoords.put("z", dummy.getBukkitEntity().getLocation().getZ());
-        botCoords.put("yaw", dummy.getBukkitEntity().getLocation().getYaw());
-        botCoords.put("pitch", dummy.getBukkitEntity().getLocation().getPitch());
-        botSaveYml.createSection(dummy.getBukkitEntity().getName(), botCoords);
-        _plg.saveBotSaveFile();
         return dummy;
     }
 
     @Override
     public void tick() { // some of this crap is not necessary but it works
+        isFullyConnected = true;
         if (!isTicking) return;
         super.tick(); // handle gamemode and inventory
         doTick(); // update health, air and other levels
@@ -134,6 +138,9 @@ public class DummyPlayer extends ServerPlayer {
             connection.resetPosition(); // maybe not necessary?
             getLevel().getChunkSource().move(this);
         }
+
+        if (getServer().getTickCount() % 20 == 0) // prevents hunger
+            getBukkitEntity().setFoodLevel(20);
 
         if (isForcePoI) goToPoI();
         selfDefence();
@@ -282,31 +289,17 @@ public class DummyPlayer extends ServerPlayer {
         attack(((CraftEntity) entity).getHandle());
     }
 
-    public void remove(String reason) {
-        dropEquipment();
-        CraftPlayer bEntity = getBukkitEntity();
-        World xpWorld = bEntity.getWorld();
-        Location xpLoc = bEntity.getLocation();
-        int xp = bEntity.getTotalExperience();
+    public void disconnect(String reason) {
         connection.disconnect(reason);
-        xpWorld.spawn(xpLoc, ExperienceOrb.class).setExperience(xp);
-        dummyNames.remove(getName().getContents());
-        dummies.remove(this);
-        AFK _plg = (AFK) Bukkit.getServer().getPluginManager().getPlugin("AFK");
-        FileConfiguration botSaveYml = _plg.getBotSaveFile();
-        botSaveYml.set(bEntity.getName(), null);
-        _plg.saveBotSaveFile();
-    }
-
-    public void softRemove() {
-        connection.disconnect("soft removed");
-        dummyNames.remove(getName().getContents());
         dummies.remove(this);
     }
 
     @Override
     public void die(DamageSource damagesource) {
         super.die(damagesource);
-        getServer().execute(new TickTask(getServer().getTickCount(), () -> remove("Died")));
+        setExperienceLevels(0); // idk why we need this but without this bot does not clear xp on death
+        setExperiencePoints(0);
+        getBukkitEntity().setTotalExperience(0); // needed to simplify xp reward calculation
+        getServer().execute(new TickTask(getServer().getTickCount(), () -> disconnect("Died")));
     }
 }

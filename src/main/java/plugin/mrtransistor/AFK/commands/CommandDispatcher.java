@@ -5,7 +5,6 @@ import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginDescriptionFile;
 import plugin.mrtransistor.AFK.AFK;
@@ -151,57 +150,19 @@ public class CommandDispatcher implements TabExecutor {
                 sender.sendMessage(ChatColor.RED + "Player names can`t be longer than 16 symbols");
                 return;
             }
-            if (!DummyPlayer.dummyNames.contains(args[0])) {
-                DummyPlayer dummy = DummyPlayer.spawnBot(args[0], ((Player) sender).getLocation(), (Player) sender);
-
-                String json = "[{\"text\":\"Bot '\", \"color\":\"white\"}," +
-                        "{\"text\":\"" + dummy.getName().getContents() + "\", \"color\":\"dark_green\"}," +
-                        "{\"text\":\"' with UUID:[\", \"color\":\"white\"}," +
-                        "{\"text\":\"" + dummy.getStringUUID() + "\", \"color\":\"gold\"," +
-                        " \"clickEvent\":{\"action\":\"copy_to_clipboard\",\"value\":\"" + dummy.getStringUUID() + "\"}," +
-                        " \"hoverEvent\":{\"action\":\"show_text\", \"value\":\"Click to copy to clipboard\"}}," +
-                        "{\"text\":\"] spawned\", \"color\":\"white\"}]";
-
-                Bukkit.dispatchCommand(sender, "tellraw " + sender.getName() + " " + json);
-            } else {
-                sender.sendMessage(ChatColor.RED + "Bot with name '" + ChatColor.DARK_GREEN + args[0] + ChatColor.RED
-                        + "' already exists");
-            }
+            if (!_plg.getConfig().getStringList("blacklistedNames").contains(args[0]))
+                DummyPlayer.spawnBot(args[0], ((Player) sender).getLocation(), (Player) sender, true);
+            else
+                sender.sendMessage(ChatColor.RED + "There`s already a player with that name");
             return;
         }
         sender.sendMessage("Sorry, this command is only for players");
     }
 
-    public static void removeBot(CommandSender sender, String[] args) {
-        for (DummyPlayer dummy : DummyPlayer.dummies) {
-            if (dummy.getName().getContents().equals(args[0])) {
-                sender.sendMessage("Bot '" + ChatColor.DARK_GREEN + args[0] + ChatColor.RESET + "' with UUID:["
-                        + ChatColor.GOLD + dummy.getStringUUID() + ChatColor.RESET + "] was removed");
-                dummy.remove("Removed using command");
-                FileConfiguration botSaveYml = _plg.getBotSaveFile();
-                botSaveYml.set(args[0], null);
-                _plg.saveBotSaveFile();
-                return;
-            }
-        }
-        sender.sendMessage(ChatColor.RED + "There is no bot with specified name");
-    }
-
     public static void removeAllBots(CommandSender sender, String[] args) {
-        int botsRemoved = 0;
-        int numBots = DummyPlayer.dummies.size();
-        for (int i = 0; i < numBots; i++) {
-            DummyPlayer dummy = DummyPlayer.dummies.get(0);
-            sender.sendMessage("Bot '" + ChatColor.DARK_GREEN + dummy.getName().getContents() + ChatColor.RESET
-                    + "' with UUID:["
-                    + ChatColor.GOLD + dummy.getStringUUID() + ChatColor.RESET + "] was removed");
-            dummy.remove("Removed using command");
-            botsRemoved++;
-        }
-        if (botsRemoved == 0) sender.sendMessage(ChatColor.RED + "There are no bots");
-        else if (botsRemoved == 1)
-            sender.sendMessage(ChatColor.GREEN + "1 bot was removed");
-        else sender.sendMessage(ChatColor.GREEN + Integer.toString(botsRemoved) + " bots were removed");
+        if (DummyPlayer.dummies.isEmpty()) sender.sendMessage(ChatColor.RED + "There are no bots");
+        while (!DummyPlayer.dummies.isEmpty())
+            DummyPlayer.dummies.get(0).disconnect("Removed using command");
     }
 
 }

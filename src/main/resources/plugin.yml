@@ -38,14 +38,6 @@ commands:
       __text__:
         tabCompletion: [ ]
         handler: spawnBot
-  removebot:
-    usage: "Usage: /removebot <name>"
-    description: "Removes all bots with specified name"
-    tabCompletion: [ ]
-    args:
-      __text__:
-        tabCompletion: [ ]
-        handler: removeBot
   removeallbots:
     usage: "Usage: /removeallbots"
     description: "Removes all bots"
