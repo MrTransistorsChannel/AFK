@@ -1,6 +1,5 @@
 package plugin.mrtransistor.AFK.commands;
 
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -104,6 +103,13 @@ public class CommandDispatcher implements TabExecutor {
         }
     }
 
+    public static void shootNearest(CommandSender sender, String[] args) {
+        for (DummyPlayer dummy : DummyPlayer.dummies) {
+            if (dummy.getName().getContents().equals(args[1]))
+                dummy.shootNearestLivingEntity();
+        }
+    }
+
     public static void attackContinuous(CommandSender sender, String[] args) {
         for (DummyPlayer dummy : DummyPlayer.dummies) {
             if (dummy.getName().getContents().equals(args[1])) {
@@ -150,7 +156,7 @@ public class CommandDispatcher implements TabExecutor {
                 sender.sendMessage(ChatColor.RED + "Player names can`t be longer than 16 symbols");
                 return;
             }
-            if (!_plg.getConfig().getStringList("blacklistedNames").contains(args[0]))
+            if (!_plg.getConfig().getStringList("blacklistedNames").contains(args[0]) && !DummyPlayer.names.contains(args[0]))
                 DummyPlayer.spawnBot(args[0], ((Player) sender).getLocation(), (Player) sender, true);
             else
                 sender.sendMessage(ChatColor.RED + "There`s already a player with that name");

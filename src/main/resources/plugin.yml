@@ -11,10 +11,13 @@ commands:
       controlBot:
         tabCompletion: [ ]
         __text__:
-          tabCompletion: [ attackOnce, toggle ]
+          tabCompletion: [ attackOnce, shootNearest, toggle ]
           attackOnce:
             tabCompletion: [ ]
             handler: attackOnce
+          shootNearest:
+            tabCompletion: [ ]
+            handler: shootNearest
           toggle:
             tabCompletion: [ attackContinuous, selfDefence, setForcePoI, ticking ]
             attackContinuous:

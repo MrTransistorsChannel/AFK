@@ -69,9 +69,8 @@ public class AFK extends JavaPlugin {
 
     private void loadBots() {
         ConfigurationSection section = botSaveYml.getConfigurationSection("botsToReload");
-        if(section == null) return;
+        if (section == null) return;
         List<String> botsToLoad = new ArrayList<>(botSaveYml.getConfigurationSection("botsToReload").getKeys(false));
-        System.out.println("satsrtbreab");
         if (botsToLoad.isEmpty()) return;
         getLogger().info(ChatColor.GREEN + "Loading " + botsToLoad.size()
                 + (botsToLoad.size() == 1 ? " bot" : " bots"));
@@ -90,7 +89,7 @@ public class AFK extends JavaPlugin {
             DummyPlayer botToSave = DummyPlayer.dummies.get(0);
             botSaveYml.createSection("botsToReload." + botToSave.getScoreboardName());
             GameProfile gameProfile = botToSave.getGameProfile();
-            if(gameProfile.getProperties().containsKey("textures")) {
+            if (gameProfile.getProperties().containsKey("textures")) {
                 Property textures = gameProfile.getProperties().get("textures").iterator().next();
                 botSaveYml.set("botsToReload." + botToSave.getScoreboardName() + ".texture", textures.getValue().toString());
                 botSaveYml.set("botsToReload." + botToSave.getScoreboardName() + ".signature", textures.getSignature().toString());
@@ -123,7 +122,7 @@ public class AFK extends JavaPlugin {
         }
     }
 
-    public FileConfiguration getBotSaveYml(){
+    public FileConfiguration getBotSaveYml() {
         return botSaveYml;
     }
 }

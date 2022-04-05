@@ -20,21 +20,20 @@ package plugin.mrtransistor.AFK;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.players.PlayerList;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.*;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.bukkit.*;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.craftbukkit.v1_18_R2.CraftServer;
 import org.bukkit.craftbukkit.v1_18_R2.CraftWorld;
 import org.bukkit.craftbukkit.v1_18_R2.entity.CraftEntity;
@@ -47,13 +46,21 @@ import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
-import java.util.Objects;
-import java.util.Set;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Predicate;
 
 public class DummyPlayer extends ServerPlayer {
+    private static double ARROW_DIST_COEFF = 0.16;
+    private static double ARROW_HEIGHT_COEFF = 0.03;
+    private static double SNOWBALL_DIST_COEFF = 0.45;
+    private static double SNOWBALL_HEIGHT_COEFF = 0.1;
+    private static double TRIDENT_DIST_COEFF = 0.26;
+    private static double TRIDENT_HEIGHT_COEFF = 0.055;
+    private LivingEntity target;
+
     public static ArrayList<DummyPlayer> dummies = new ArrayList<>();
+    public static ArrayList<String> names = new ArrayList<>();
     public boolean isFullyConnected = false;
     private boolean isSelfDefending = false;
     private boolean isAttackingContinuous = false;
@@ -74,10 +81,10 @@ public class DummyPlayer extends ServerPlayer {
         } else {
             ConfigurationSection botsToReload = ((AFK) server.server.getPluginManager().getPlugin("AFK")).getBotSaveYml()
                     .getConfigurationSection("botsToReload");
-            if(botsToReload.getKeys(false).contains(getScoreboardName())) {
+            if (botsToReload.getKeys(false).contains(getScoreboardName())) {
                 String texture = botsToReload.getConfigurationSection(getScoreboardName()).getString("texture");
                 String signature = botsToReload.getConfigurationSection(getScoreboardName()).getString("signature");
-                if(texture != null && signature != null)
+                if (texture != null && signature != null)
                     return new String[]{texture, signature};
             }
             return null;
@@ -87,6 +94,7 @@ public class DummyPlayer extends ServerPlayer {
     public DummyPlayer(MinecraftServer server, ServerLevel world, GameProfile profile) {
         super(server, world, profile);
         dummies.add(this);
+        names.add(getScoreboardName());
     }
 
     public static DummyPlayer spawnBot(String name, Location location, org.bukkit.entity.Player spawner, boolean updateStats) { // some of this crap is redundant but it works
@@ -145,19 +153,7 @@ public class DummyPlayer extends ServerPlayer {
         if (isForcePoI) goToPoI();
         selfDefence();
         if (isAttackingContinuous) attackContinuous();
-
-        /*if (getServer().getTickCount() % 100 == 0) {
-            CraftPlayer bukkitEntity = getBukkitEntity();
-            if (bukkitEntity.getItemInHand().getType().equals(Material.BOW)) {
-                startUsingItem(InteractionHand.MAIN_HAND);
-                bukkitEntity.launchProjectile(Arrow.class);
-            } else if (bukkitEntity.getItemInHand().getType().equals(Material.SNOWBALL)) {
-                startUsingItem(InteractionHand.MAIN_HAND);
-                bukkitEntity.launchProjectile(Snowball.class);
-            }
-        }
-        System.out.println(getUseItemRemainingTicks());*/
-
+        rangeAttackTarget();
     }
 
     public void attackOnce() {
@@ -166,6 +162,28 @@ public class DummyPlayer extends ServerPlayer {
             attack(target);
         }
         swing(InteractionHand.MAIN_HAND);
+    }
+
+    public void shootOnce() {
+    }
+
+    public void shootNearestLivingEntity() {
+        CraftPlayer bukkitEntity = getBukkitEntity();
+        List<Entity> nearbyEntities = bukkitEntity.getNearbyEntities(35, 35, 35);
+        Entity nearest = null;
+        double nearestDistance = 0;
+
+        for (Entity e : nearbyEntities) {
+            if (!(e instanceof CraftLivingEntity) || e instanceof Player) continue;
+            if ((nearest == null || e.getLocation().distanceSquared(getBukkitEntity().getLocation()) < nearestDistance)
+                    && bukkitEntity.hasLineOfSight(e)) {
+                nearest = e;
+                nearestDistance = e.getLocation().distanceSquared(getBukkitEntity().getLocation());
+            }
+        }
+        if (nearest != null) {
+            target = (LivingEntity) ((CraftEntity) nearest).getHandle();
+        }
     }
 
     public void setTicking(boolean state) {
@@ -269,6 +287,60 @@ public class DummyPlayer extends ServerPlayer {
         }
     }
 
+    private void rangeAttackTarget() {
+        if (target == null) return;
+
+        lookAt(EntityAnchorArgument.Anchor.EYES, target, EntityAnchorArgument.Anchor.EYES);
+        double x = getX() - target.getX();
+        double y = getY() - target.getY();
+        double z = getZ() - target.getZ();
+        double r = Math.sqrt(x * x + z * z); // distance in X-Z plane
+
+        ItemStack itemStackInHand = getItemInHand(InteractionHand.MAIN_HAND);
+        Item itemInHand = itemStackInHand.getItem();
+
+        float pitch = getXRot(); // correcting pitch for distance to target, totally simplified, but it has enough accuracy
+        if (itemInHand instanceof BowItem || itemInHand instanceof CrossbowItem) {
+            setXRot((float) (pitch - r * ARROW_DIST_COEFF + y * ARROW_HEIGHT_COEFF));
+            if (itemInHand instanceof BowItem) {
+                if (!isUsingItem()) {
+                    itemInHand.use(getLevel(), this, InteractionHand.MAIN_HAND);
+                }
+                if (BowItem.getPowerForTime(getTicksUsingItem()) == 1.0) {
+                    itemStackInHand.releaseUsing(getLevel(), this, 0);
+                    stopUsingItem();
+                    target = null;
+                }
+            } else {
+                if (!isUsingItem() || CrossbowItem.isCharged(itemStackInHand)) {
+                    if (CrossbowItem.isCharged(itemStackInHand))
+                        target = null;
+                    itemInHand.use(getLevel(), this, InteractionHand.MAIN_HAND);
+                }
+                if (getTicksUsingItem() >= CrossbowItem.getChargeDuration(itemStackInHand)) {
+                    itemInHand.releaseUsing(itemStackInHand, getLevel(), this, 0);
+                    stopUsingItem();
+                }
+            }
+        } else if (itemInHand instanceof SnowballItem || itemInHand instanceof EggItem) {
+            setXRot((float) (pitch - r * SNOWBALL_DIST_COEFF + y * SNOWBALL_HEIGHT_COEFF));
+            itemInHand.use(getLevel(), this, InteractionHand.MAIN_HAND);
+            target = null;
+        } else if (itemInHand instanceof TridentItem) {
+            setXRot((float) (pitch - r * TRIDENT_DIST_COEFF + y * TRIDENT_HEIGHT_COEFF));
+            if (!isUsingItem())
+                itemInHand.use(getLevel(), this, InteractionHand.MAIN_HAND);
+            if ((float) getTicksUsingItem() >= 10 && !isAutoSpinAttack()) {
+                itemInHand.releaseUsing(itemStackInHand, getLevel(), this, 0);
+                target = null;
+            }
+
+        } else {
+            setXRot(pitch);
+            target = null;
+        }
+    }
+
     public CraftLivingEntity getTargetedLivingEntity() {
         Player bukkitPlayer = getBukkitEntity();
         World world = bukkitPlayer.getWorld();
@@ -292,6 +364,7 @@ public class DummyPlayer extends ServerPlayer {
     public void disconnect(String reason) {
         connection.disconnect(reason);
         dummies.remove(this);
+        names.remove(getScoreboardName());
     }
 
     @Override
@@ -299,6 +372,7 @@ public class DummyPlayer extends ServerPlayer {
         super.die(damagesource);
         setExperienceLevels(0); // idk why we need this but without this bot does not clear xp on death
         setExperiencePoints(0);
+        removeAllEffects();
         getBukkitEntity().setTotalExperience(0); // needed to simplify xp reward calculation
         getServer().execute(new TickTask(getServer().getTickCount(), () -> disconnect("Died")));
     }

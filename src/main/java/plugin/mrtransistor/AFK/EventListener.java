@@ -20,13 +20,13 @@ public class EventListener implements Listener {
     }
 
     @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent e){
+    public void onPlayerJoin(PlayerJoinEvent e) {
         if (!(((CraftEntity) e.getPlayer()).getHandle() instanceof DummyPlayer)) {
             FileConfiguration botSaveYml = Bukkit.getPluginManager().getPlugin("AFK").getConfig();
             List<String> blacklistedNames = new ArrayList<>();
-            if(botSaveYml.contains("blacklistedNames"))
+            if (botSaveYml.contains("blacklistedNames"))
                 blacklistedNames = botSaveYml.getStringList("blacklistedNames");
-            if(!blacklistedNames.contains(e.getPlayer().getName()))
+            if (!blacklistedNames.contains(e.getPlayer().getName()))
                 blacklistedNames.add(e.getPlayer().getName());
             botSaveYml.set("blacklistedNames", blacklistedNames);
             Bukkit.getPluginManager().getPlugin("AFK").saveConfig();
@@ -35,7 +35,9 @@ public class EventListener implements Listener {
 
     @EventHandler // handles removing bot from list if lost connection not by DummyPlayer#die() or #disconnect()
     public void onPlayerDisconnect(PlayerQuitEvent e) {
-        if (((CraftEntity) e.getPlayer()).getHandle() instanceof DummyPlayer)
+        if (((CraftEntity) e.getPlayer()).getHandle() instanceof DummyPlayer) {
             DummyPlayer.dummies.remove((DummyPlayer) ((CraftEntity) e.getPlayer()).getHandle());
+            DummyPlayer.names.remove(e.getPlayer().getName());
+        }
     }
 }
