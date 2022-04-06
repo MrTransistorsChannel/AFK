@@ -39,6 +39,7 @@ import org.bukkit.craftbukkit.v1_18_R2.CraftWorld;
 import org.bukkit.craftbukkit.v1_18_R2.entity.CraftEntity;
 import org.bukkit.craftbukkit.v1_18_R2.entity.CraftLivingEntity;
 import org.bukkit.craftbukkit.v1_18_R2.entity.CraftPlayer;
+import org.bukkit.entity.Enderman;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -61,6 +62,7 @@ public class DummyPlayer extends ServerPlayer {
 
     public static ArrayList<DummyPlayer> dummies = new ArrayList<>();
     public static ArrayList<String> names = new ArrayList<>();
+    public String locale = "en_us"; // Needed to prevent plugins using aikar`s ACF library from throwing NoSuchFieldException
     public boolean isFullyConnected = false;
     private boolean isSelfDefending = false;
     private boolean isAttackingContinuous = false;
@@ -136,7 +138,7 @@ public class DummyPlayer extends ServerPlayer {
     }
 
     @Override
-    public void tick() { // some of this crap is not necessary but it works
+    public void tick() { // still can`t figure out how to process knockback from players
         isFullyConnected = true;
         if (!isTicking) return;
         super.tick(); // handle gamemode and inventory
@@ -154,6 +156,30 @@ public class DummyPlayer extends ServerPlayer {
         selfDefence();
         if (isAttackingContinuous) attackContinuous();
         rangeAttackTarget();
+
+        /*Location targetLoc = Bukkit.getServer().getPlayer("MrTransistor_").getLocation();
+        Location loc = this.getBukkitEntity().getLocation();
+        BlockPos targetPos = ((CraftBlock) targetLoc.getBlock()).getPosition();
+        BlockPos pos = ((CraftBlock) loc.getBlock()).getPosition();
+        Zombie zombie = new Zombie(this.getLevel());
+        Vec3 vecPos = new Vec3(pos.getX(), pos.getY(), pos.getZ());
+        zombie.setPos(vecPos);
+        zombie.setOnGround(true);
+
+        PathFinder pathFinder = new PathFinder(new WalkNodeEvaluator(), 300);                                                                                                                                                                                                                                           
+        PathNavigationRegion reg = new PathNavigationRegion(((CraftWorld) loc.getWorld()).getHandle(),
+                pos.offset(-120, -120, -120), pos.offset(120, 120, 120));
+        Path path = pathFinder.findPath(reg,
+                zombie, ImmutableSet.of(targetPos), 120, 1, 1.f);
+        path.advance();
+        if(path.isDone()) return;
+        BlockPos nextNode = path.getNextNodePos();
+        System.out.println(nextNode);
+        PoI_loc = loc;
+        PoI_loc.setX(nextNode.getX()+0.5);
+        PoI_loc.setY(nextNode.getY()+1.6);
+        PoI_loc.setZ(nextNode.getZ()+0.5);*/
+
     }
 
     public void attackOnce() {
@@ -164,17 +190,15 @@ public class DummyPlayer extends ServerPlayer {
         swing(InteractionHand.MAIN_HAND);
     }
 
-    public void shootOnce() {
-    }
-
     public void shootNearestLivingEntity() {
         CraftPlayer bukkitEntity = getBukkitEntity();
-        List<Entity> nearbyEntities = bukkitEntity.getNearbyEntities(35, 35, 35);
+        List<Entity> nearbyEntities = bukkitEntity.getNearbyEntities(50, 50, 50);
         Entity nearest = null;
         double nearestDistance = 0;
 
         for (Entity e : nearbyEntities) {
-            if (!(e instanceof CraftLivingEntity) || e instanceof Player) continue;
+            if (!(e instanceof CraftLivingEntity)
+                    || e instanceof Player || e instanceof Enderman || e.isDead()) continue;
             if ((nearest == null || e.getLocation().distanceSquared(getBukkitEntity().getLocation()) < nearestDistance)
                     && bukkitEntity.hasLineOfSight(e)) {
                 nearest = e;

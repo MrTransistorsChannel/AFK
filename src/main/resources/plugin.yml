@@ -6,9 +6,9 @@ commands:
   afkutils:
     usage: "Usage: /afkutils controlBot <name>"
     description: "Allows players to control bots"
-    tabCompletion: [ controlBot ]
+    tabCompletion: [ control ]
     args:
-      controlBot:
+      control:
         tabCompletion: [ ]
         __text__:
           tabCompletion: [ attackOnce, shootNearest, toggle ]
