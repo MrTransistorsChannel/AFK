@@ -18,9 +18,12 @@
  */
 package plugin.mrtransistor.AFK;
 
+import com.google.common.collect.ImmutableSet;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerLevel;
@@ -28,9 +31,15 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.item.*;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.PathNavigationRegion;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.level.pathfinder.PathFinder;
+import net.minecraft.world.level.pathfinder.WalkNodeEvaluator;
 import net.minecraft.world.phys.Vec3;
 import org.bukkit.*;
 import org.bukkit.configuration.ConfigurationSection;
@@ -59,6 +68,10 @@ public class DummyPlayer extends ServerPlayer {
     private static double TRIDENT_DIST_COEFF = 0.26;
     private static double TRIDENT_HEIGHT_COEFF = 0.055;
     private LivingEntity target;
+
+    //WIP
+    //private Mob pathfindingMob;
+    //private PathFinder pathFinder = new PathFinder(new WalkNodeEvaluator(), 300);
 
     public static ArrayList<DummyPlayer> dummies = new ArrayList<>();
     public static ArrayList<String> names = new ArrayList<>();
@@ -124,6 +137,8 @@ public class DummyPlayer extends ServerPlayer {
                     return;
                 } else if (location != null && location.getWorld() != null)
                     dummy.teleportTo(world, location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
+                //WIP
+                //dummy.pathfindingMob = new Zombie(dummy.getLevel()); // Initialising pathfinding mob
                 this.cancel();
             }
         }.runTaskTimer(server.server.getPluginManager().getPlugin("AFK"), 0, 10);
@@ -147,7 +162,15 @@ public class DummyPlayer extends ServerPlayer {
         if (getServer().getTickCount() % 10 == 0) { // update position in chunks
             connection.resetPosition(); // maybe not necessary?
             getLevel().getChunkSource().move(this);
-        }
+            setSprinting(getDeltaMovement().x() > 0 || getDeltaMovement().z() > 0); // sets sprinting disabled when bot
+        }                                                                           // doesn't move to prevent particles
+
+        //WIP
+        /*if (pathfindingMob != null) {
+            Vec3 vecPos = new Vec3(getX(), getY(), getZ()); // updating position of pathfinder mob
+            pathfindingMob.setPos(vecPos);
+            pathfindingMob.setOnGround(true); // maybe not needed?
+        }*/
 
         if (getServer().getTickCount() % 20 == 0) // prevents hunger
             getBukkitEntity().setFoodLevel(20);
@@ -157,28 +180,32 @@ public class DummyPlayer extends ServerPlayer {
         if (isAttackingContinuous) attackContinuous();
         rangeAttackTarget();
 
-        /*Location targetLoc = Bukkit.getServer().getPlayer("MrTransistor_").getLocation();
-        Location loc = this.getBukkitEntity().getLocation();
-        BlockPos targetPos = ((CraftBlock) targetLoc.getBlock()).getPosition();
-        BlockPos pos = ((CraftBlock) loc.getBlock()).getPosition();
-        Zombie zombie = new Zombie(this.getLevel());
-        Vec3 vecPos = new Vec3(pos.getX(), pos.getY(), pos.getZ());
-        zombie.setPos(vecPos);
-        zombie.setOnGround(true);
+        //WIP
+        /*
+        if (pathfindingMob == null) return;
+        Player targetPlayer = Bukkit.getServer().getPlayer("MrTransistor_");
+        if (targetPlayer == null) return;
+        Location targetLoc = targetPlayer.getLocation();
+        BlockPos targetPos = new BlockPos(targetLoc.getBlockX(), targetLoc.getBlockY(), targetLoc.getBlockZ());
 
-        PathFinder pathFinder = new PathFinder(new WalkNodeEvaluator(), 300);                                                                                                                                                                                                                                           
-        PathNavigationRegion reg = new PathNavigationRegion(((CraftWorld) loc.getWorld()).getHandle(),
-                pos.offset(-120, -120, -120), pos.offset(120, 120, 120));
-        Path path = pathFinder.findPath(reg,
-                zombie, ImmutableSet.of(targetPos), 120, 1, 1.f);
-        path.advance();
-        if(path.isDone()) return;
-        BlockPos nextNode = path.getNextNodePos();
-        System.out.println(nextNode);
-        PoI_loc = loc;
-        PoI_loc.setX(nextNode.getX()+0.5);
-        PoI_loc.setY(nextNode.getY()+1.6);
-        PoI_loc.setZ(nextNode.getZ()+0.5);*/
+        Path pathToTarget = pathToTarget(targetPos, 120);
+
+        pathToTarget.advance();
+        if (pathToTarget.isDone()) return;
+
+        if (targetPos.distSqr(new Vec3i(getBlockX(), getBlockY(), getBlockZ())) < 16) {
+            lookAt(EntityAnchorArgument.Anchor.EYES, ((CraftPlayer) targetPlayer).getHandle(), EntityAnchorArgument.Anchor.EYES);
+            return;
+        }
+        Vec3 toTarget = getEyePosition().subtract(pathToTarget.getNextNode().asVec3().add(0.5, 1.6, 0.5)).normalize();
+        float yaw = (float) Math.atan2(toTarget.x(), -toTarget.z());
+        float pitch = (float) Math.atan2(toTarget.y(), Math.sqrt(toTarget.x() * toTarget.x() + toTarget.z() * toTarget.z()));
+        yaw *= 180 / Math.PI;
+        pitch *= 180 / Math.PI;
+        setRot(yaw, pitch);
+        setYHeadRot(yaw);
+        travel(new Vec3(0, 0, 1));
+         */
 
     }
 
@@ -209,6 +236,14 @@ public class DummyPlayer extends ServerPlayer {
             target = (LivingEntity) ((CraftEntity) nearest).getHandle();
         }
     }
+
+    //WIP
+    /*private Path pathToTarget(BlockPos target, int range) {
+        BlockPos pos = new BlockPos(getBlockX(), getBlockY(), getBlockZ());
+        PathNavigationRegion region = new PathNavigationRegion(getLevel(), pos.offset(-range, -range, -range),
+                pos.offset(range, range, range));
+        return pathFinder.findPath(region, pathfindingMob, ImmutableSet.of(target), range, 1, 1.f);
+    }*/
 
     public void setTicking(boolean state) {
         isTicking = state;
