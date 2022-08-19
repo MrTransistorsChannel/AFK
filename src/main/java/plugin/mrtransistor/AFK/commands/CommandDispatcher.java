@@ -43,6 +43,7 @@ public class CommandDispatcher implements TabExecutor {
                         .invoke(null, sender, args);
                 return true;
             } catch (Exception e) {
+                e.printStackTrace();
                 return false;
             }
         } else {
@@ -64,6 +65,7 @@ public class CommandDispatcher implements TabExecutor {
                         .invoke(null, sender, args);
                 return true;
             } catch (Exception e) {
+                e.printStackTrace();
                 return false;
             }
         }
@@ -98,21 +100,21 @@ public class CommandDispatcher implements TabExecutor {
 
     public static void attackOnce(CommandSender sender, String[] args) {
         for (DummyPlayer dummy : DummyPlayer.dummies) {
-            if (dummy.getName().getContents().equals(args[1]))
+            if (dummy.getName().getString().equals(args[1]))
                 dummy.attackOnce();
         }
     }
 
     public static void shootNearest(CommandSender sender, String[] args) {
         for (DummyPlayer dummy : DummyPlayer.dummies) {
-            if (dummy.getName().getContents().equals(args[1]))
+            if (dummy.getName().getString().equals(args[1]))
                 dummy.shootNearestLivingEntity();
         }
     }
 
     public static void attackContinuous(CommandSender sender, String[] args) {
         for (DummyPlayer dummy : DummyPlayer.dummies) {
-            if (dummy.getName().getContents().equals(args[1])) {
+            if (dummy.getName().getString().equals(args[1])) {
                 dummy.setAttackingContinuous(!dummy.isAttackingContinuous());
                 sender.sendMessage(ChatColor.GREEN + "Continuous attacking is toggled " + ChatColor.DARK_GREEN
                         + (dummy.isAttackingContinuous() ? "ON" : "OFF"));
@@ -122,7 +124,7 @@ public class CommandDispatcher implements TabExecutor {
 
     public static void selfDefence(CommandSender sender, String[] args) {
         for (DummyPlayer dummy : DummyPlayer.dummies) {
-            if (dummy.getName().getContents().equals(args[1])) {
+            if (dummy.getName().getString().equals(args[1])) {
                 dummy.setSelfDefending(!dummy.isSelfDefending());
                 sender.sendMessage(ChatColor.GREEN + "Self defence is toggled " + ChatColor.DARK_GREEN
                         + (dummy.isSelfDefending() ? "ON" : "OFF"));
@@ -132,7 +134,7 @@ public class CommandDispatcher implements TabExecutor {
 
     public static void setForcePoI(CommandSender sender, String[] args) {
         for (DummyPlayer dummy : DummyPlayer.dummies) {
-            if (dummy.getName().getContents().equals(args[1])) {
+            if (dummy.getName().getString().equals(args[1])) {
                 dummy.setForcePoI(!dummy.isForcePoI());
                 sender.sendMessage(ChatColor.GREEN + "Force point of interest is toggled " + ChatColor.DARK_GREEN
                         + (dummy.isForcePoI() ? "ON" : "OFF"));
@@ -142,7 +144,7 @@ public class CommandDispatcher implements TabExecutor {
 
     public static void ticking(CommandSender sender, String[] args) {
         for (DummyPlayer dummy : DummyPlayer.dummies) {
-            if (dummy.getName().getContents().equals(args[1])) {
+            if (dummy.getName().getString().equals(args[1])) {
                 dummy.setTicking(!dummy.isTicking());
                 sender.sendMessage(ChatColor.GREEN + "Entity ticking is " + ChatColor.DARK_GREEN
                         + (dummy.isTicking() ? "enabled" : "disabled"));

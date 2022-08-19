@@ -3,12 +3,12 @@ plugins {
 }
 apply from: rootProject.file('specialSource.gradle')
 
-version = '3.0.0'
+version = '3.0.0-MC1.19.2'
 group = 'plugin.mrtransistor.AFK'
 
 ext {
     author = 'MrTransistor'
-    spigotVersion = '1.18.2-R0.1-SNAPSHOT'
+    spigotVersion = '1.19.2-R0.1-SNAPSHOT'
     remapServerCode = true
 
     mainClass = group + '.' + rootProject.getName()
