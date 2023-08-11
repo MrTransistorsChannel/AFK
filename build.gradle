@@ -3,7 +3,7 @@ plugins {
 }
 apply from: rootProject.file('specialSource.gradle')
 
-version = '3.0.0-MC1.19.4'
+version = '3.0.1-MC1.19.4'
 group = 'plugin.mrtransistor.AFK'
 
 ext {
