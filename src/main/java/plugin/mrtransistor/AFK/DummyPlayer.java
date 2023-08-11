@@ -291,8 +291,8 @@ public class DummyPlayer extends ServerPlayer {
                 Vector toTarget = getBukkitEntity().getEyeLocation().toVector().subtract(PoI_loc.toVector()).normalize();
                 float yaw = (float) Math.atan2(toTarget.getX(), -toTarget.getZ());
                 float pitch = (float) Math.atan2(toTarget.getY(), Math.sqrt(toTarget.getX() * toTarget.getX() + toTarget.getZ() * toTarget.getZ()));
-                yaw *= 180 / Math.PI;
-                pitch *= 180 / Math.PI;
+                yaw *= (float) (180 / Math.PI);
+                pitch *= (float) (180 / Math.PI);
                 setRot(yaw, pitch);
                 setYHeadRot(yaw);
                 travel(new Vec3(0, 0, 1));
