@@ -1,22 +1,18 @@
 package plugin.mrtransistor.AFK.commands;
 
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.server.ConsoleInput;
-import net.minecraft.server.dedicated.DedicatedServer;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.command.TabExecutor;
-import org.bukkit.craftbukkit.v1_19_R3.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginDescriptionFile;
 import plugin.mrtransistor.AFK.AFK;
 import plugin.mrtransistor.AFK.DummyPlayer;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 public class CommandDispatcher implements TabExecutor {
