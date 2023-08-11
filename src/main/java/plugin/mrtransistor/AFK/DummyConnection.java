@@ -19,12 +19,10 @@
 package plugin.mrtransistor.AFK;
 
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.channel.local.LocalAddress;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.PacketFlow;
 
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 
 public class DummyConnection extends Connection {
 

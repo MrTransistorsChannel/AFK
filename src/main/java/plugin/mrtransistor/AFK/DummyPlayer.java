@@ -18,30 +18,19 @@
  */
 package plugin.mrtransistor.AFK;
 
-import com.google.common.collect.ImmutableSet;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Vec3i;
-import net.minecraft.network.Connection;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.item.*;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.PathNavigationRegion;
-import net.minecraft.world.level.pathfinder.Path;
-import net.minecraft.world.level.pathfinder.PathFinder;
-import net.minecraft.world.level.pathfinder.WalkNodeEvaluator;
 import net.minecraft.world.phys.Vec3;
 import org.bukkit.*;
 import org.bukkit.configuration.ConfigurationSection;
@@ -57,19 +46,18 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
-import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Predicate;
 
 public class DummyPlayer extends ServerPlayer {
-    private static double ARROW_DIST_COEFF = 0.16;
-    private static double ARROW_HEIGHT_COEFF = 0.03;
-    private static double SNOWBALL_DIST_COEFF = 0.45;
-    private static double SNOWBALL_HEIGHT_COEFF = 0.1;
-    private static double TRIDENT_DIST_COEFF = 0.26;
-    private static double TRIDENT_HEIGHT_COEFF = 0.055;
+    private static final double ARROW_DIST_COEFF = 0.16;
+    private static final double ARROW_HEIGHT_COEFF = 0.03;
+    private static final double SNOWBALL_DIST_COEFF = 0.45;
+    private static final double SNOWBALL_HEIGHT_COEFF = 0.1;
+    private static final double TRIDENT_DIST_COEFF = 0.26;
+    private static final double TRIDENT_HEIGHT_COEFF = 0.055;
     private LivingEntity target;
 
     //WIP
@@ -115,7 +103,7 @@ public class DummyPlayer extends ServerPlayer {
         names.add(getScoreboardName());
     }
 
-    public static DummyPlayer spawnBot(String name, Location location, org.bukkit.entity.Player spawner, boolean updateStats) { // some of this crap is redundant but it works
+    public static void spawnBot(String name, Location location, Player spawner, boolean updateStats) { // some of this crap is redundant but it works
         MinecraftServer server = ((CraftServer) Bukkit.getServer()).getServer();
         ServerLevel world = (location != null && location.getWorld() != null) ? ((CraftWorld) location.getWorld()).getHandle()
                 : server.getLevel(Level.OVERWORLD);
@@ -131,8 +119,6 @@ public class DummyPlayer extends ServerPlayer {
 
         /* spawning entity */
         server.getPlayerList().placeNewPlayer(new DummyConnection(), dummy);
-
-        System.out.println(dummy.connection.getRemoteAddress());
 
         new BukkitRunnable() {
             @Override
@@ -154,7 +140,6 @@ public class DummyPlayer extends ServerPlayer {
             dummy.setGameMode(GameType.SURVIVAL);
         }
         dummy.getEntityData().set(DATA_PLAYER_MODE_CUSTOMISATION, (byte) 0xf7);
-        return dummy;
     }
 
     @Override
@@ -421,6 +406,12 @@ public class DummyPlayer extends ServerPlayer {
         else return null;
     }
 
+    //TODO: find a way to send commands as bots
+    /*@Override
+    public CommandSourceStack createCommandSourceStack() {
+        return new CommandSourceStack((net.minecraft.world.entity.Entity) this, this.position(), this.getRotationVector(), this.level instanceof ServerLevel ? (ServerLevel)this.level : null, this.getPermissionLevel(), this.getName().getString(), this.getDisplayName(), this.level.getServer(), this);
+    }*/
+
     public void attack(Entity entity) {
         attack(((CraftEntity) entity).getHandle());
     }
@@ -436,6 +427,7 @@ public class DummyPlayer extends ServerPlayer {
         super.die(damagesource);
         setExperienceLevels(0); // idk why we need this but without this bot does not clear xp on death
         setExperiencePoints(0);
+        clearFire();
         removeAllEffects();
         getBukkitEntity().setTotalExperience(0); // needed to simplify xp reward calculation
         getServer().execute(new TickTask(getServer().getTickCount(), () -> disconnect("Died")));
