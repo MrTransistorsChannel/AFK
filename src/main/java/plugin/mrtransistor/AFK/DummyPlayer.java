@@ -28,6 +28,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.LargeFireball;
 import net.minecraft.world.item.*;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -36,12 +37,12 @@ import org.bukkit.*;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.craftbukkit.v1_19_R3.CraftServer;
 import org.bukkit.craftbukkit.v1_19_R3.CraftWorld;
-import org.bukkit.craftbukkit.v1_19_R3.entity.CraftEntity;
-import org.bukkit.craftbukkit.v1_19_R3.entity.CraftLivingEntity;
-import org.bukkit.craftbukkit.v1_19_R3.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_19_R3.entity.*;
+import org.bukkit.craftbukkit.v1_19_R3.util.CraftVector;
 import org.bukkit.entity.Enderman;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
@@ -52,13 +53,13 @@ import java.util.UUID;
 import java.util.function.Predicate;
 
 public class DummyPlayer extends ServerPlayer {
-    private static final double ARROW_DIST_COEFF = 0.16;
-    private static final double ARROW_HEIGHT_COEFF = 0.03;
-    private static final double SNOWBALL_DIST_COEFF = 0.45;
-    private static final double SNOWBALL_HEIGHT_COEFF = 0.1;
-    private static final double TRIDENT_DIST_COEFF = 0.26;
-    private static final double TRIDENT_HEIGHT_COEFF = 0.055;
-    private LivingEntity target;
+    private static final float ARROW_DIST_COEFF = 0.16F;
+    private static final float ARROW_HEIGHT_COEFF = 0.03F;
+    private static final float SNOWBALL_DIST_COEFF = 0.45F;
+    private static final float SNOWBALL_HEIGHT_COEFF = 0.1F;
+    private static final float TRIDENT_DIST_COEFF = 0.26F;
+    private static final float TRIDENT_HEIGHT_COEFF = 0.055F;
+    private net.minecraft.world.entity.Entity target;
 
     //WIP
     //private Mob pathfindingMob;
@@ -214,8 +215,8 @@ public class DummyPlayer extends ServerPlayer {
         double nearestDistance = 0;
 
         for (Entity e : nearbyEntities) {
-            if (!(e instanceof CraftLivingEntity)
-                    || e instanceof Player || e instanceof Enderman || e.isDead()) continue;
+            if (!(e instanceof CraftLivingEntity || e instanceof CraftFireball)
+                    || e instanceof Player || e instanceof Enderman || e instanceof Villager || e.isDead()) continue;
             if ((nearest == null || e.getLocation().distanceSquared(getBukkitEntity().getLocation()) < nearestDistance)
                     && bukkitEntity.hasLineOfSight(e)) {
                 nearest = e;
@@ -223,7 +224,7 @@ public class DummyPlayer extends ServerPlayer {
             }
         }
         if (nearest != null) {
-            target = (LivingEntity) ((CraftEntity) nearest).getHandle();
+            target = ((CraftEntity) nearest).getHandle();
         }
     }
 
@@ -339,55 +340,74 @@ public class DummyPlayer extends ServerPlayer {
     private void rangeAttackTarget() {
         if (target == null) return;
 
-        lookAt(EntityAnchorArgument.Anchor.EYES, target, EntityAnchorArgument.Anchor.EYES);
-        double x = getX() - target.getX();
-        double y = getY() - target.getY();
-        double z = getZ() - target.getZ();
-        double r = Math.sqrt(x * x + z * z); // distance in X-Z plane
-
         ItemStack itemStackInHand = getItemInHand(InteractionHand.MAIN_HAND);
         Item itemInHand = itemStackInHand.getItem();
 
-        float pitch = getXRot(); // correcting pitch for distance to target, totally simplified, but it has enough accuracy
-        if (itemInHand instanceof BowItem || itemInHand instanceof CrossbowItem) {
-            setXRot((float) (pitch - r * ARROW_DIST_COEFF + y * ARROW_HEIGHT_COEFF));
-            if (itemInHand instanceof BowItem) {
-                if (!isUsingItem()) {
-                    itemInHand.use(getLevel(), this, InteractionHand.MAIN_HAND);
-                }
-                if (BowItem.getPowerForTime(getTicksUsingItem()) == 1.0) {
-                    itemStackInHand.releaseUsing(getLevel(), this, 0);
-                    stopUsingItem();
+        lookAt(EntityAnchorArgument.Anchor.EYES, target, EntityAnchorArgument.Anchor.EYES);
+
+        // Correcting pitch for distance to target, rough approximation, but it has enough accuracy
+        float weaponPitchCorrection = 0;
+        float x = (float) (getX() - target.getX());
+        float y = (float) (getY() - target.getY());
+        float z = (float) (getZ() - target.getZ());
+        float r = (float) Math.sqrt(x * x + z * z); // distance in X-Z plane
+
+        if (itemInHand instanceof BowItem || itemInHand instanceof CrossbowItem)
+            weaponPitchCorrection = -r * ARROW_DIST_COEFF + y * ARROW_HEIGHT_COEFF;
+        else if (itemInHand instanceof SnowballItem || itemInHand instanceof EggItem)
+            weaponPitchCorrection = -r * SNOWBALL_DIST_COEFF + y * SNOWBALL_HEIGHT_COEFF;
+        else if (itemInHand instanceof TridentItem)
+            weaponPitchCorrection = -r * TRIDENT_DIST_COEFF + y * TRIDENT_DIST_COEFF;
+
+        // Correcting for target movement speed
+        Vec3 targetVel = new Vec3(target.getDeltaMovement().x(), 0, target.getDeltaMovement().z());
+        Vec3 lookDir = getLookAngle().normalize();
+
+        float targetSpeedPitchCorrection, targetSpeedYawCorrection;
+
+        if (target.invulnerableTime > 10 || target instanceof LargeFireball) {
+            targetSpeedPitchCorrection = 0;
+            targetSpeedYawCorrection = 0;
+        } else {
+            targetSpeedPitchCorrection = (float) (-targetVel.dot(lookDir) * r * 0.7);
+            targetSpeedYawCorrection = (float) (-targetVel.dot(lookDir.yRot((float) (Math.PI/2))) * r * 1.2);
+        }
+
+        setYRot(getYRot() + targetSpeedYawCorrection);
+        setXRot(getXRot() + weaponPitchCorrection + targetSpeedPitchCorrection);
+
+        if (itemInHand instanceof BowItem) {
+            if (!isUsingItem()) {
+                itemInHand.use(getLevel(), this, InteractionHand.MAIN_HAND);
+            }
+            if (BowItem.getPowerForTime(getTicksUsingItem()) == 1.0) {
+                itemStackInHand.releaseUsing(getLevel(), this, 0);
+                stopUsingItem();
+                target = null;
+            }
+        } else if (itemInHand instanceof CrossbowItem) {
+            if (!isUsingItem() || CrossbowItem.isCharged(itemStackInHand)) {
+                if (CrossbowItem.isCharged(itemStackInHand))
                     target = null;
-                }
-            } else {
-                if (!isUsingItem() || CrossbowItem.isCharged(itemStackInHand)) {
-                    if (CrossbowItem.isCharged(itemStackInHand))
-                        target = null;
-                    itemInHand.use(getLevel(), this, InteractionHand.MAIN_HAND);
-                }
-                if (getTicksUsingItem() >= CrossbowItem.getChargeDuration(itemStackInHand)) {
-                    itemInHand.releaseUsing(itemStackInHand, getLevel(), this, 0);
-                    stopUsingItem();
-                }
+                itemInHand.use(getLevel(), this, InteractionHand.MAIN_HAND);
+            }
+            if (getTicksUsingItem() >= CrossbowItem.getChargeDuration(itemStackInHand)) {
+                itemInHand.releaseUsing(itemStackInHand, getLevel(), this, 0);
+                stopUsingItem();
             }
         } else if (itemInHand instanceof SnowballItem || itemInHand instanceof EggItem) {
-            setXRot((float) (pitch - r * SNOWBALL_DIST_COEFF + y * SNOWBALL_HEIGHT_COEFF));
             itemInHand.use(getLevel(), this, InteractionHand.MAIN_HAND);
             target = null;
         } else if (itemInHand instanceof TridentItem) {
-            setXRot((float) (pitch - r * TRIDENT_DIST_COEFF + y * TRIDENT_HEIGHT_COEFF));
             if (!isUsingItem())
                 itemInHand.use(getLevel(), this, InteractionHand.MAIN_HAND);
             if ((float) getTicksUsingItem() >= 10 && !isAutoSpinAttack()) {
                 itemInHand.releaseUsing(itemStackInHand, getLevel(), this, 0);
                 target = null;
             }
-
-        } else {
-            setXRot(pitch);
+        } else
             target = null;
-        }
+
     }
 
     public CraftLivingEntity getTargetedLivingEntity() {
